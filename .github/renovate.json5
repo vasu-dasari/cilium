@@ -67,8 +67,7 @@
     "main",
     "v1.16",
     "v1.15",
-    "v1.14",
-    "v1.13"
+    "v1.14"
   ],
   "vulnerabilityAlerts": {
     "enabled": true
@@ -189,8 +188,7 @@
         "main",
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -205,8 +203,7 @@
       matchBaseBranches: [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -273,8 +270,7 @@
       matchBaseBranches: [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -284,8 +280,7 @@
       ],
       "allowedVersions": "<3.5.5",
       "matchBaseBranches": [
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -333,8 +328,7 @@
       "matchBaseBranches": [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ],
     },
     {
@@ -346,8 +340,7 @@
       "matchBaseBranches": [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -371,23 +364,13 @@
     },
     {
       "matchPackageNames": [
-        "docker.io/library/alpine"
-      ],
-      "allowedVersions": "<3.18",
-      "matchBaseBranches": [
-        "v1.13"
-      ]
-    },
-    {
-      "matchPackageNames": [
         "quay.io/cilium/certgen",
       ],
       "allowedVersions": "<0.2.0",
       "matchBaseBranches": [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -431,23 +414,6 @@
       ]
     },
     {
-      // Do not bump the minor version for Cilium <v1.14. Certain workflows
-      // are already using Cilium CLI v0.15.*, so let's enable patch versions.
-      "enabled": false,
-      "groupName": "Cilium CLI",
-      "groupSlug": "cilium-cli",
-      "matchDepNames": [
-        "cilium/cilium-cli"
-      ],
-      "matchUpdateTypes": [
-        "major",
-        "minor"
-      ],
-      "matchBaseBranches": [
-        "v1.13"
-      ]
-    },
-    {
       "groupName": "Hubble CLI",
       "groupSlug": "hubble-cli",
       "matchDepNames": [
@@ -479,8 +445,7 @@
       "matchBaseBranches": [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
@@ -502,8 +467,7 @@
       "matchBaseBranches": [
         "v1.16",
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ],
     },
     {
@@ -602,8 +566,7 @@
       "allowedVersions": "<1.29",
       "matchBaseBranches": [
         "v1.15",
-        "v1.14",
-        "v1.13"
+        "v1.14"
       ]
     },
     {
