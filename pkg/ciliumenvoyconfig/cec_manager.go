@@ -28,7 +28,7 @@ type ciliumEnvoyConfigManager interface {
 	addCiliumEnvoyConfig(cecObjectMeta metav1.ObjectMeta, cecSpec *ciliumv2.CiliumEnvoyConfigSpec) error
 	updateCiliumEnvoyConfig(oldCECObjectMeta metav1.ObjectMeta, oldCECSpec *ciliumv2.CiliumEnvoyConfigSpec, newCECObjectMeta metav1.ObjectMeta, newCECSpec *ciliumv2.CiliumEnvoyConfigSpec) error
 	deleteCiliumEnvoyConfig(cecObjectMeta metav1.ObjectMeta, cecSpec *ciliumv2.CiliumEnvoyConfigSpec) error
-	syncCiliumEnvoyConfigService(name string, namespace string, cecSpec *ciliumv2.CiliumEnvoyConfigSpec) error
+	syncHeadlessService(name string, namespace string, cecSpec *ciliumv2.CiliumEnvoyConfigSpec) error
 }
 
 type cecManager struct {
@@ -153,10 +153,10 @@ func (r *cecManager) addK8sServiceRedirects(resourceName service.L7LBResourceNam
 			return err
 		}
 	}
-	return r.syncCiliumEnvoyConfigService(resourceName.Name, resourceName.Namespace, spec)
+	return r.syncHeadlessService(resourceName.Name, resourceName.Namespace, spec)
 }
 
-func (r *cecManager) syncCiliumEnvoyConfigService(name string, namespace string, spec *ciliumv2.CiliumEnvoyConfigSpec) error {
+func (r *cecManager) syncHeadlessService(name string, namespace string, spec *ciliumv2.CiliumEnvoyConfigSpec) error {
 	resourceName := service.L7LBResourceName{Name: name, Namespace: namespace}
 
 	// Register services for Envoy backend sync

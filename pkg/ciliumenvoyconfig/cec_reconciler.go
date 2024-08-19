@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/cilium/cilium/pkg/k8s"
 	ciliumv2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	"github.com/cilium/cilium/pkg/k8s/resource"
 	"github.com/cilium/cilium/pkg/k8s/slim/k8s/apis/labels"
@@ -298,19 +299,31 @@ func (r *ciliumEnvoyConfigReconciler) configSelectsLocalNode(cfg *config) (bool,
 	return true, nil
 }
 
-func (r *ciliumEnvoyConfigReconciler) syncHeadlessService(_ context.Context) error {
+func (r *ciliumEnvoyConfigReconciler) syncEndpoints(_ context.Context, event resource.Event[*k8s.Endpoints]) error {
 	r.mutex.Lock()
 	defer r.mutex.Unlock()
 
 	var reconcileErr error
+	defer event.Done(reconcileErr)
 
-	for key, cfg := range r.configs {
-		if err := r.manager.syncCiliumEnvoyConfigService(cfg.meta.Name, cfg.meta.Namespace, cfg.spec); err != nil {
-			r.logger.WithField("key", key).WithError(err).Info("Failed to sync headless service, Hive will retry")
-			reconcileErr = errors.Join(reconcileErr, fmt.Errorf("failed to reconcile existing config (%s): %w", key, err))
-			continue
-		}
+	if event.Object == nil {
+		return nil
 	}
 
+	for key, cfg := range r.configs {
+		for _, svc := range cfg.spec.BackendServices {
+			if svc.Name != event.Object.EndpointSliceID.ServiceID.Name ||
+				svc.Namespace != event.Object.EndpointSliceID.Namespace {
+				continue
+			}
+
+			if err := r.manager.syncHeadlessService(cfg.meta.Name, cfg.meta.Namespace, cfg.spec); err != nil {
+				r.logger.WithField("key", key).
+					WithField(logfields.ServiceKey, event.Key).
+					WithError(err).Error("failed to sync headless service")
+				reconcileErr = errors.Join(reconcileErr, fmt.Errorf("failed to sync headless service (%s): %w", key, err))
+			}
+		}
+	}
 	return reconcileErr
 }
