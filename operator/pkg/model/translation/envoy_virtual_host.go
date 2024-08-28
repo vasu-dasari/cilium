@@ -331,7 +331,8 @@ func requestMirrorMutation(mirrors []*model.HTTPRequestMirror) routeActionMutati
 				Cluster: fmt.Sprintf("%s:%s:%s", m.Backend.Namespace, m.Backend.Name, m.Backend.Port.GetPort()),
 				RuntimeFraction: &envoy_config_core_v3.RuntimeFractionalPercent{
 					DefaultValue: &envoy_type_v3.FractionalPercent{
-						Numerator: 100,
+						Numerator:   uint32(m.Numerator),
+						Denominator: envoy_type_v3.FractionalPercent_DenominatorType(m.Denominator),
 					},
 				},
 			})
