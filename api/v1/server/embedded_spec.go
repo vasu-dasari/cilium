@@ -987,6 +987,9 @@ func init() {
         "parameters": [
           {
             "$ref": "#/parameters/cidr"
+          },
+          {
+            "$ref": "#/parameters/labels"
           }
         ],
         "responses": {
@@ -6580,6 +6583,14 @@ func init() {
             "description": "A CIDR range of IPs",
             "name": "cidr",
             "in": "query"
+          },
+          {
+            "description": "List of labels\n",
+            "name": "labels",
+            "in": "body",
+            "schema": {
+              "$ref": "#/definitions/Labels"
+            }
           }
         ],
         "responses": {
