@@ -24,6 +24,7 @@ import (
 	"github.com/cilium/cilium/pkg/option"
 	"github.com/cilium/cilium/pkg/promise"
 	"github.com/cilium/cilium/pkg/proxy/endpoint"
+	"github.com/cilium/cilium/pkg/shortener"
 	"github.com/cilium/cilium/pkg/time"
 )
 
@@ -49,6 +50,7 @@ type envoyProxyConfig struct {
 	ProxyPrometheusPort               int
 	ProxyAdminPort                    int
 	EnvoyLog                          string
+	EnvoyDefaultLogLevel              string
 	EnvoyBaseID                       uint64
 	EnvoyKeepCapNetbindservice        bool
 	ProxyConnectTimeout               uint
@@ -72,6 +74,7 @@ func (r envoyProxyConfig) Flags(flags *pflag.FlagSet) {
 	flags.Int("proxy-prometheus-port", 0, "Port to serve Envoy metrics on. Default 0 (disabled).")
 	flags.Int("proxy-admin-port", 0, "Port to serve Envoy admin interface on.")
 	flags.String("envoy-log", "", "Path to a separate Envoy log file, if any")
+	flags.String("envoy-default-log-level", "", "Default log level of Envoy application log that is configured if Cilium debug / verbose logging isn't enabled. If not defined, the default log level of the Cilium Agent is used.")
 	flags.Uint64("envoy-base-id", 0, "Envoy base ID")
 	flags.Bool("envoy-keep-cap-netbindservice", false, "Keep capability NET_BIND_SERVICE for Envoy process")
 	flags.Uint("proxy-connect-timeout", 2, "Time after which a TCP connect attempt is considered failed unless completed (in seconds)")
@@ -174,6 +177,7 @@ func newEnvoyXDSServer(params xdsServerParams) (XDSServer, error) {
 			XDSServer:                xdsServer,
 			runDir:                   option.Config.RunDir,
 			envoyLogPath:             params.EnvoyProxyConfig.EnvoyLog,
+			envoyDefaultLogLevel:     params.EnvoyProxyConfig.EnvoyDefaultLogLevel,
 			envoyBaseID:              params.EnvoyProxyConfig.EnvoyBaseID,
 			keepCapNetBindService:    params.EnvoyProxyConfig.EnvoyKeepCapNetbindservice,
 			metricsListenerPort:      params.EnvoyProxyConfig.ProxyPrometheusPort,
@@ -188,8 +192,8 @@ func newEnvoyXDSServer(params xdsServerParams) (XDSServer, error) {
 	return xdsServer, nil
 }
 
-func newEnvoyAdminClient() *EnvoyAdminClient {
-	return NewEnvoyAdminClientForSocket(GetSocketDir(option.Config.RunDir))
+func newEnvoyAdminClient(envoyProxyConfig envoyProxyConfig) *EnvoyAdminClient {
+	return NewEnvoyAdminClientForSocket(GetSocketDir(option.Config.RunDir), envoyProxyConfig.EnvoyDefaultLogLevel)
 }
 
 type accessLogServerParams struct {
@@ -345,7 +349,7 @@ func registerSecretSyncer(params syncerParams) error {
 
 	for ns := range namespaces {
 		jobGroup.Add(job.Observer(
-			fmt.Sprintf("k8s-secrets-resource-events-%s", ns),
+			shortener.ShortenK8sResourceName(fmt.Sprintf("k8s-secrets-resource-events-%s", ns)),
 			secretSyncer.handleSecretEvent,
 			newK8sSecretResource(params.Lifecycle, params.K8sClientset, ns),
 		))

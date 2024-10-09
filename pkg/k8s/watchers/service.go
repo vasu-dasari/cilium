@@ -415,6 +415,7 @@ func (k *K8sServiceWatcher) datapathSVCs(svc *k8s.Service, endpoints *k8s.Endpoi
 
 	// apply common service properties
 	for i := range svcs {
+		svcs[i].ForwardingMode = svc.ForwardingMode
 		svcs[i].ExtTrafficPolicy = svc.ExtTrafficPolicy
 		svcs[i].IntTrafficPolicy = svc.IntTrafficPolicy
 		svcs[i].HealthCheckNodePort = svc.HealthCheckNodePort
@@ -432,14 +433,14 @@ func (k *K8sServiceWatcher) datapathSVCs(svc *k8s.Service, endpoints *k8s.Endpoi
 // checkServiceNodeExposure returns true if the service should be installed onto the
 // local node, and false if the node should ignore and not install the service.
 func (k *K8sServiceWatcher) checkServiceNodeExposure(svc *k8s.Service) (bool, error) {
-	if serviceLabelValue, serviceLabelExists := svc.Labels[annotation.ServiceNodeExposure]; serviceLabelExists {
+	if serviceAnnotationValue, serviceAnnotationExists := svc.Annotations[annotation.ServiceNodeExposure]; serviceAnnotationExists {
 		ln, err := k.localNodeStore.Get(context.Background())
 		if err != nil {
 			return false, fmt.Errorf("failed to retrieve local node: %w", err)
 		}
 
 		nodeLabelValue, nodeLabelExists := ln.Labels[annotation.ServiceNodeExposure]
-		if !nodeLabelExists || nodeLabelValue != serviceLabelValue {
+		if !nodeLabelExists || nodeLabelValue != serviceAnnotationValue {
 			return false, nil
 		}
 	}
@@ -542,6 +543,7 @@ func (k *K8sServiceWatcher) addK8sSVCs(svcID k8s.ServiceID, oldSvc, svc *k8s.Ser
 			Frontend:                  dpSvc.Frontend,
 			Backends:                  dpSvc.Backends,
 			Type:                      dpSvc.Type,
+			ForwardingMode:            dpSvc.ForwardingMode,
 			ExtTrafficPolicy:          dpSvc.ExtTrafficPolicy,
 			IntTrafficPolicy:          dpSvc.IntTrafficPolicy,
 			SessionAffinity:           dpSvc.SessionAffinity,

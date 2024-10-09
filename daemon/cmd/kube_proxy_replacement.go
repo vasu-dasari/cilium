@@ -62,24 +62,27 @@ func initKubeProxyReplacementOptions(sysctl sysctl.Sysctl, tunnelConfig tunnel.C
 	if option.Config.EnableNodePort {
 		if option.Config.NodePortMode != option.NodePortModeSNAT &&
 			option.Config.NodePortMode != option.NodePortModeDSR &&
-			option.Config.NodePortMode != option.NodePortModeHybrid {
+			option.Config.NodePortMode != option.NodePortModeHybrid &&
+			option.Config.NodePortMode != option.NodePortModeAnnotation {
 			return fmt.Errorf("Invalid value for --%s: %s", option.NodePortMode, option.Config.NodePortMode)
 		}
 
 		if option.Config.NodePortMode == option.NodePortModeDSR &&
 			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchOption &&
 			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchIPIP &&
-			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchGeneve ||
-			option.Config.NodePortMode == option.NodePortModeHybrid &&
-				option.Config.LoadBalancerDSRDispatch != option.DSRDispatchOption &&
-				option.Config.LoadBalancerDSRDispatch != option.DSRDispatchGeneve {
+			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchGeneve {
 			return fmt.Errorf("Invalid value for --%s: %s", option.LoadBalancerDSRDispatch, option.Config.LoadBalancerDSRDispatch)
 		}
 
-		if option.Config.NodePortMode == option.NodePortModeDSR &&
-			option.Config.LoadBalancerDSRL4Xlate != option.DSRL4XlateFrontend &&
-			option.Config.LoadBalancerDSRL4Xlate != option.DSRL4XlateBackend {
-			return fmt.Errorf("Invalid value for --%s: %s", option.LoadBalancerDSRL4Xlate, option.Config.LoadBalancerDSRL4Xlate)
+		if option.Config.NodePortMode == option.NodePortModeHybrid &&
+			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchOption &&
+			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchGeneve {
+			return fmt.Errorf("Invalid value for --%s: %s", option.LoadBalancerDSRDispatch, option.Config.LoadBalancerDSRDispatch)
+		}
+
+		if option.Config.NodePortMode == option.NodePortModeAnnotation &&
+			option.Config.LoadBalancerDSRDispatch != option.DSRDispatchIPIP {
+			return fmt.Errorf("Invalid value for --%s: %s", option.LoadBalancerDSRDispatch, option.Config.LoadBalancerDSRDispatch)
 		}
 
 		if option.Config.LoadBalancerRSSv4CIDR != "" {
@@ -203,7 +206,8 @@ func initKubeProxyReplacementOptions(sysctl sysctl.Sysctl, tunnelConfig tunnel.C
 
 		option.Config.EnableHealthDatapath =
 			option.Config.DatapathMode == datapathOption.DatapathModeLBOnly &&
-				option.Config.NodePortMode == option.NodePortModeDSR &&
+				(option.Config.NodePortMode == option.NodePortModeDSR ||
+					option.Config.NodePortMode == option.NodePortModeAnnotation) &&
 				option.Config.LoadBalancerDSRDispatch == option.DSRDispatchIPIP
 	}
 
@@ -410,7 +414,7 @@ func finishKubeProxyReplacementInit(sysctl sysctl.Sysctl, devices []*tables.Devi
 		// and the client IP is reachable via other device than the direct
 		// routing one.
 
-		if val, err := sysctl.Read(fmt.Sprintf("net.ipv4.conf.%s.rp_filter", directRoutingDevice)); err != nil {
+		if val, err := sysctl.Read([]string{"net", "ipv4", "conf", directRoutingDevice, "rp_filter"}); err != nil {
 			log.Warnf("Unable to read net.ipv4.conf.%s.rp_filter: %s. Ignoring the check",
 				directRoutingDevice, err)
 		} else {
@@ -506,7 +510,7 @@ func markHostExtension() {
 // Otherwise, if EnableAutoProtectNodePortRange == true, then append the nodeport
 // range to ip_local_reserved_ports.
 func checkNodePortAndEphemeralPortRanges(sysctl sysctl.Sysctl) error {
-	ephemeralPortRangeStr, err := sysctl.Read("net.ipv4.ip_local_port_range")
+	ephemeralPortRangeStr, err := sysctl.Read([]string{"net", "ipv4", "ip_local_port_range"})
 	if err != nil {
 		return fmt.Errorf("Unable to read net.ipv4.ip_local_port_range: %w", err)
 	}
@@ -538,7 +542,7 @@ func checkNodePortAndEphemeralPortRanges(sysctl sysctl.Sysctl) error {
 			nodePortRangeStr, ephemeralPortRangeStr)
 	}
 
-	reservedPortsStr, err := sysctl.Read("net.ipv4.ip_local_reserved_ports")
+	reservedPortsStr, err := sysctl.Read([]string{"net", "ipv4", "ip_local_reserved_ports"})
 	if err != nil {
 		return fmt.Errorf("Unable to read net.ipv4.ip_local_reserved_ports: %w", err)
 	}
@@ -584,7 +588,7 @@ func checkNodePortAndEphemeralPortRanges(sysctl sysctl.Sysctl) error {
 		reservedPortsStr += ","
 	}
 	reservedPortsStr += fmt.Sprintf("%d-%d", option.Config.NodePortMin, option.Config.NodePortMax)
-	if err := sysctl.Write("net.ipv4.ip_local_reserved_ports", reservedPortsStr); err != nil {
+	if err := sysctl.Write([]string{"net", "ipv4", "ip_local_reserved_ports"}, reservedPortsStr); err != nil {
 		return fmt.Errorf("Unable to addend nodeport range (%s) to net.ipv4.ip_local_reserved_ports: %w",
 			nodePortRangeStr, err)
 	}

@@ -6,7 +6,6 @@ package nodeipam
 import (
 	"context"
 	"slices"
-	"sort"
 
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -36,15 +35,17 @@ var (
 
 type nodeSvcLBReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
-	Logger logrus.FieldLogger
+	Scheme      *runtime.Scheme
+	DefaultIPAM bool
+	Logger      logrus.FieldLogger
 }
 
-func newNodeSvcLBReconciler(mgr ctrl.Manager, logger logrus.FieldLogger) *nodeSvcLBReconciler {
+func newNodeSvcLBReconciler(mgr ctrl.Manager, logger logrus.FieldLogger, defaultIpam bool) *nodeSvcLBReconciler {
 	return &nodeSvcLBReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Logger: logger,
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		DefaultIPAM: defaultIpam,
+		Logger:      logger,
 	}
 }
 
@@ -163,8 +164,10 @@ func (r nodeSvcLBReconciler) isServiceSupported(svc *corev1.Service) bool {
 	if svc.Spec.Type != corev1.ServiceTypeLoadBalancer {
 		return false
 	}
-	return svc.Spec.LoadBalancerClass != nil &&
-		*svc.Spec.LoadBalancerClass == nodeSvcLBClass
+	if svc.Spec.LoadBalancerClass == nil {
+		return r.DefaultIPAM
+	}
+	return *svc.Spec.LoadBalancerClass == nodeSvcLBClass
 }
 
 // getEndpointSliceNodes returns the set of node names if eTP=Local. If eTP=Cluster
@@ -279,7 +282,7 @@ func getNodeLoadBalancerIngresses(nodes []corev1.Node, ipFamilies []corev1.IPFam
 	} else {
 		ips = intIPs.UnsortedList()
 	}
-	sort.Strings(ips)
+	slices.Sort(ips)
 
 	ingresses := make([]corev1.LoadBalancerIngress, len(ips))
 	for i, ip := range ips {

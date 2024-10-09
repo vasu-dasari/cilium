@@ -860,6 +860,13 @@ func init() {
             "description": "Brief will return a brief representation of the Cilium status.\n",
             "name": "brief",
             "in": "header"
+          },
+          {
+            "type": "boolean",
+            "default": true,
+            "description": "If set to true, failure of the agent to connect to the Kubernetes control plane will cause the agent's health status to also fail.\n",
+            "name": "require-k8s-connectivity",
+            "in": "header"
           }
         ],
         "responses": {
@@ -2216,6 +2223,13 @@ func init() {
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "match-families": {
+          "description": "Matches any of the provided address families. If empty matches all address families.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BgpFamily"
           }
         },
         "match-neighbors": {
@@ -3841,7 +3855,8 @@ func init() {
                   "enum": [
                     "SNAT",
                     "DSR",
-                    "Hybrid"
+                    "Hybrid",
+                    "Annotation"
                   ]
                 },
                 "portMax": {
@@ -6444,6 +6459,13 @@ func init() {
             "description": "Brief will return a brief representation of the Cilium status.\n",
             "name": "brief",
             "in": "header"
+          },
+          {
+            "type": "boolean",
+            "default": true,
+            "description": "If set to true, failure of the agent to connect to the Kubernetes control plane will cause the agent's health status to also fail.\n",
+            "name": "require-k8s-connectivity",
+            "in": "header"
           }
         ],
         "responses": {
@@ -7917,6 +7939,13 @@ func init() {
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "match-families": {
+          "description": "Matches any of the provided address families. If empty matches all address families.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BgpFamily"
           }
         },
         "match-neighbors": {
@@ -9643,7 +9672,8 @@ func init() {
                   "enum": [
                     "SNAT",
                     "DSR",
-                    "Hybrid"
+                    "Hybrid",
+                    "Annotation"
                   ]
                 },
                 "portMax": {
@@ -9830,7 +9860,8 @@ func init() {
               "enum": [
                 "SNAT",
                 "DSR",
-                "Hybrid"
+                "Hybrid",
+                "Annotation"
               ]
             },
             "portMax": {
@@ -10008,7 +10039,8 @@ func init() {
           "enum": [
             "SNAT",
             "DSR",
-            "Hybrid"
+            "Hybrid",
+            "Annotation"
           ]
         },
         "portMax": {

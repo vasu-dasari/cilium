@@ -171,8 +171,7 @@ func upsertStat[KT tupleKey](m *Stats, topk *topk[KT], family nat.IPFamily) erro
 	defer tx.Abort()
 
 	var errs error
-	iter := m.table.All(tx)
-	for entry, _, ok := iter.Next(); ok; entry, _, ok = iter.Next() {
+	for entry := range m.table.All(tx) {
 		if entry.Type == family.String() {
 			_, _, err := m.table.Delete(tx, entry)
 			errors.Join(errs, err)
@@ -204,6 +203,10 @@ func upsertStat[KT tupleKey](m *Stats, topk *topk[KT], family nat.IPFamily) erro
 	return nil
 }
 
+func flagsIsIn(flags uint8) bool {
+	return flags&tuple.TUPLE_F_IN == tuple.TUPLE_F_IN
+}
+
 func (m *Stats) countNat(ctx context.Context) error {
 	var errs error
 	if m.natMap4 != nil {
@@ -211,7 +214,7 @@ func (m *Stats) countNat(ctx context.Context) error {
 		_, err := m.natMap4.ApplyBatch4(func(keys []tuple.TupleKey4, vals []nat.NatEntry4, size int) {
 			for i := 0; i < size; i++ {
 				key := *keys[i].ToHost().(*tuple.TupleKey4)
-				if key.Flags == tuple.TUPLE_F_IN &&
+				if flagsIsIn(key.Flags) &&
 					(key.NextHeader == u8proto.TCP || key.NextHeader == u8proto.ICMP ||
 						key.NextHeader == u8proto.UDP) {
 					key.DestPort = 0
@@ -239,7 +242,7 @@ func (m *Stats) countNat(ctx context.Context) error {
 		_, err := m.natMap6.ApplyBatch6(func(keys []tuple.TupleKey6, vals []nat.NatEntry6, size int) {
 			for i := 0; i < size; i++ {
 				key := *keys[i].ToHost().(*tuple.TupleKey6)
-				if key.Flags == tuple.TUPLE_F_IN &&
+				if flagsIsIn(key.Flags) &&
 					(key.NextHeader == u8proto.TCP || key.NextHeader == u8proto.ICMPv6 ||
 						key.NextHeader == u8proto.UDP) {
 					key.DestPort = 0

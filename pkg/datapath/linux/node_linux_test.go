@@ -46,7 +46,7 @@ import (
 
 type linuxPrivilegedBaseTestSuite struct {
 	sysctl     sysctl.Sysctl
-	mtuConfig  mtu.Configuration
+	mtuCalc    mtu.RouteMTU
 	enableIPv4 bool
 	enableIPv6 bool
 
@@ -84,13 +84,16 @@ const (
 	dummyHostDeviceName     = "dummy_host"
 	dummyExternalDeviceName = "dummy_external"
 
-	baseIPv4Time = "net.ipv4.neigh.default.base_reachable_time_ms"
-	baseIPv6Time = "net.ipv6.neigh.default.base_reachable_time_ms"
-	baseTime     = 2500
+	baseTime = 2500
+	mcastNum = 6
+)
 
-	mcastNumIPv4 = "net.ipv4.neigh.default.mcast_solicit"
-	mcastNumIPv6 = "net.ipv6.neigh.default.mcast_solicit"
-	mcastNum     = 6
+var (
+	baseIPv4Time = []string{"net", "ipv4", "neigh", "default", "base_reachable_time_ms"}
+	baseIPv6Time = []string{"net", "ipv6", "neigh", "default", "base_reachable_time_ms"}
+
+	mcastNumIPv4 = []string{"net", "ipv4", "neigh", "default", "mcast_solicit"}
+	mcastNumIPv6 = []string{"net", "ipv6", "neigh", "default", "mcast_solicit"}
 )
 
 func setupLinuxPrivilegedBaseTestSuite(tb testing.TB, addressing datapath.NodeAddressing, enableIPv6, enableIPv4 bool) *linuxPrivilegedBaseTestSuite {
@@ -100,7 +103,8 @@ func setupLinuxPrivilegedBaseTestSuite(tb testing.TB, addressing datapath.NodeAd
 	s.sysctl = sysctl.NewDirectSysctl(afero.NewOsFs(), "/proc")
 
 	rlimit.RemoveMemlock()
-	s.mtuConfig = mtu.NewConfiguration(0, false, false, false, false, 1500, nil, false)
+	mtuConfig := mtu.NewConfiguration(0, false, false, false, false)
+	s.mtuCalc = mtuConfig.Calculate(1500)
 	s.enableIPv6 = enableIPv6
 	s.enableIPv4 = enableIPv4
 
@@ -140,9 +144,9 @@ func setupLinuxPrivilegedBaseTestSuite(tb testing.TB, addressing datapath.NodeAd
 		AllocCIDRIPv6:       addressing.IPv6().AllocationCIDR(),
 		EnableIPv4:          s.enableIPv4,
 		EnableIPv6:          s.enableIPv6,
-		DeviceMTU:           s.mtuConfig.GetDeviceMTU(),
-		RouteMTU:            s.mtuConfig.GetRouteMTU(),
-		RoutePostEncryptMTU: s.mtuConfig.GetRoutePostEncryptMTU(),
+		DeviceMTU:           s.mtuCalc.DeviceMTU,
+		RouteMTU:            s.mtuCalc.RouteMTU,
+		RoutePostEncryptMTU: s.mtuCalc.RoutePostEncryptMTU,
 	}
 
 	tunnel.SetTunnelMap(tunnel.NewTunnelMap("test_cilium_tunnel_map"))
@@ -197,6 +201,7 @@ func setupLinuxPrivilegedIPv4AndIPv6TestSuite(tb testing.TB) *linuxPrivilegedIPv
 }
 
 func tearDownTest(tb testing.TB) {
+	ipsec.UnsetTestIPSecKey()
 	ipsec.DeleteXFRM(hivetest.Logger(tb), ipsec.AllReqID)
 	node.UnsetTestLocalNodeStore()
 	removeDevice(dummyHostDeviceName)
@@ -823,6 +828,9 @@ func TestNodeChurnXFRMLeaks(t *testing.T) {
 	defer removeDevice(externalNodeDevice)
 	option.Config.EncryptInterface = []string{externalNodeDevice}
 	option.Config.RoutingMode = option.RoutingModeNative
+
+	// Same test suite, remove previous IPSec key.
+	ipsec.UnsetTestIPSecKey()
 
 	// Cover the XFRM configuration for subnet encryption: IPAM modes AKS and EKS.
 	ipv4PodSubnets, err := cidr.ParseCIDR("4.4.0.0/16")

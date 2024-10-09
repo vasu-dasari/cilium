@@ -1,18 +1,35 @@
-# syntax=docker/dockerfile:1.9@sha256:fe40cf4e92cd0c467be2cfc30657a680ae2398318afd50b0c80585784c604f28
+# syntax=docker/dockerfile:1.10@sha256:865e5dd094beca432e8c0a1d5e1c465db5f998dca4e439981029b3b81fb39ed5
 
 # Copyright Authors of Cilium
 # SPDX-License-Identifier: Apache-2.0
 
-FROM docker.io/library/golang:1.22.5-alpine3.19@sha256:48aac60d4f50477055967586f60391fb1f3cbdc2e176e36f1f7f3fd0f5380ef7 AS builder
-WORKDIR /go/src/github.com/cilium/cilium
-RUN apk add --no-cache git make ca-certificates
-COPY . .
-RUN make -C cilium-cli
+ARG GOLANG_IMAGE=docker.io/library/golang:1.23.2@sha256:adee809c2d0009a4199a11a1b2618990b244c6515149fe609e2788ddf164bd10
+# BUILDPLATFORM is an automatic platform ARG enabled by Docker BuildKit.
+# Represents the plataform where the build is happening, do not mix with
+# TARGETARCH
+FROM --platform=${BUILDPLATFORM} ${GOLANG_IMAGE} AS builder
 
-FROM ubuntu:24.04@sha256:2e863c44b718727c860746568e1d54afd13b2fa71b160f5cd9058fc436217b30 AS release
+# TARGETOS is an automatic platform ARG enabled by Docker BuildKit.
+ARG TARGETOS
+# TARGETARCH is an automatic platform ARG enabled by Docker BuildKit.
+ARG TARGETARCH
+
+WORKDIR /go/src/github.com/cilium/cilium
+
+RUN --mount=type=bind,readwrite,target=/go/src/github.com/cilium/cilium \
+    --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/go/pkg \
+    make GOARCH=${TARGETARCH} DESTDIR=/out/${TARGETOS}/${TARGETARCH} ${MODIFIERS} \
+    -C cilium-cli install
+
+FROM docker.io/library/ubuntu:24.04@sha256:b359f1067efa76f37863778f7b6d0e8d911e3ee8efa807ad01fbf5dc1ef9006b AS release
+# TARGETOS is an automatic platform ARG enabled by Docker BuildKit.
+ARG TARGETOS
+# TARGETARCH is an automatic platform ARG enabled by Docker BuildKit.
+ARG TARGETARCH
 LABEL maintainer="maintainer@cilium.io"
 WORKDIR /root/app
-COPY --from=builder /go/src/github.com/cilium/cilium/cilium-cli/cilium /usr/local/bin/cilium
+COPY --from=builder /out/${TARGETOS}/${TARGETARCH}/usr/local/bin/cilium /usr/local/bin/cilium
 
 # Install cloud CLIs. Based on these instructions:
 # - https://cloud.google.com/sdk/docs/install#deb

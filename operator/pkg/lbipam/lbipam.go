@@ -83,7 +83,8 @@ type lbIPAMParams struct {
 
 	metrics *ipamMetrics
 
-	config lbipamConfig
+	config      lbipamConfig
+	defaultIPAM bool
 }
 
 func newLBIPAM(params lbIPAMParams) *LBIPAM {
@@ -104,9 +105,6 @@ type LBIPAM struct {
 	pools        map[string]*cilium_api_v2alpha1.CiliumLoadBalancerIPPool
 	rangesStore  rangesStore
 	serviceStore serviceStore
-
-	// Only used during testing.
-	initDoneCallbacks []func()
 }
 
 func (ipam *LBIPAM) restart() {
@@ -119,7 +117,7 @@ func (ipam *LBIPAM) restart() {
 
 	// Re-start the main goroutine
 	ipam.jobGroup.Add(
-		job.OneShot("lbipam main", func(ctx context.Context, health cell.Health) error {
+		job.OneShot("lbipam-main", func(ctx context.Context, health cell.Health) error {
 			ipam.Run(ctx, health)
 			return nil
 		}),
@@ -134,13 +132,6 @@ func (ipam *LBIPAM) Run(ctx context.Context, health cell.Health) {
 
 	ipam.logger.Info("LB-IPAM initializing")
 	svcChan := ipam.initialize(ctx, poolChan)
-
-	for _, cb := range ipam.initDoneCallbacks {
-		if cb != nil {
-			cb()
-		}
-	}
-
 	ipam.logger.Info("LB-IPAM done initializing")
 
 	for {
@@ -264,12 +255,6 @@ func (ipam *LBIPAM) handleServiceEvent(ctx context.Context, event resource.Event
 		}
 	}
 	event.Done(err)
-}
-
-// RegisterOnReady registers a callback function which will be invoked when LBIPAM is done initializing.
-// Note: mainly used in the integration tests.
-func (ipam *LBIPAM) RegisterOnReady(cb func()) {
-	ipam.initDoneCallbacks = append(ipam.initDoneCallbacks, cb)
 }
 
 func (ipam *LBIPAM) poolOnUpsert(ctx context.Context, pool *cilium_api_v2alpha1.CiliumLoadBalancerIPPool) error {
@@ -653,6 +638,11 @@ func (ipam *LBIPAM) stripOrImportIngresses(sv *ServiceView) (statusModified bool
 				IP:     ip,
 				Origin: lbRange,
 			})
+
+			// If the `ServiceView` has a sharing key, add the IP to the `rangeStore` index
+			if sv.SharingKey != "" {
+				ipam.rangesStore.AddServiceViewIPForSharingKey(sv.SharingKey, &sv.AllocatedIPs[len(sv.AllocatedIPs)-1])
+			}
 		}
 
 		newIngresses = append(newIngresses, ingress)
@@ -1141,10 +1131,8 @@ func (ipam *LBIPAM) isResponsibleForSVC(svc *slim_core_v1.Service) bool {
 		return false
 	}
 
-	// If no load balancer class is specified, we will assume that we are responsible for the service
-	// unless we have been configured to require a load balancer class.
 	if svc.Spec.LoadBalancerClass == nil {
-		return !ipam.lbIPAMParams.config.LBIPAMRequireLBClass
+		return ipam.lbIPAMParams.defaultIPAM
 	}
 
 	if !slices.Contains(ipam.lbClasses, *svc.Spec.LoadBalancerClass) {

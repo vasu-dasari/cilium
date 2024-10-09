@@ -80,6 +80,7 @@ type svcInfo struct {
 	backendByHash map[string]*lb.Backend
 
 	svcType                   lb.SVCType
+	svcForwardingMode         lb.SVCForwardingMode
 	svcExtTrafficPolicy       lb.SVCTrafficPolicy
 	svcIntTrafficPolicy       lb.SVCTrafficPolicy
 	svcNatPolicy              lb.SVCNatPolicy
@@ -113,6 +114,7 @@ func (svc *svcInfo) deepCopyToLBSVC() *lb.SVC {
 		Frontend:            *svc.frontend.DeepCopy(),
 		Backends:            backends,
 		Type:                svc.svcType,
+		ForwardingMode:      svc.svcForwardingMode,
 		ExtTrafficPolicy:    svc.svcExtTrafficPolicy,
 		IntTrafficPolicy:    svc.svcIntTrafficPolicy,
 		NatPolicy:           svc.svcNatPolicy,
@@ -138,6 +140,9 @@ func (svc *svcInfo) isExtLocal() bool {
 }
 
 func (svc *svcInfo) isIntLocal() bool {
+	if !option.Config.EnableInternalTrafficPolicy {
+		return false
+	}
 	switch svc.svcType {
 	case lb.SVCTypeClusterIP, lb.SVCTypeNodePort, lb.SVCTypeLoadBalancer, lb.SVCTypeExternalIPs:
 		return svc.svcIntTrafficPolicy == lb.SVCTrafficPolicyLocal
@@ -274,6 +279,7 @@ type Service struct {
 
 	healthCheckers         []HealthChecker
 	healthCheckSubscribers []HealthSubscriber
+	healthCheckChan        chan any
 
 	lbmap         datapathTypes.LBMap
 	lastUpdatedTs atomic.Value
@@ -300,6 +306,7 @@ func newService(monitorAgent monitorAgent.Agent, lbmap datapathTypes.LBMap, back
 		backendByHash:            map[string]*lb.Backend{},
 		monitorAgent:             monitorAgent,
 		healthServer:             localHealthServer,
+		healthCheckChan:          make(chan any),
 		lbmap:                    lbmap,
 		l7lbSvcs:                 map[lb.ServiceName]*L7LBInfo{},
 		backendConnectionHandler: backendConnectionHandler{},
@@ -310,7 +317,7 @@ func newService(monitorAgent monitorAgent.Agent, lbmap datapathTypes.LBMap, back
 	svc.lastUpdatedTs.Store(time.Now())
 
 	for _, hc := range healthCheckers {
-		hc.SetCallback(svc.HealthCheckCallback)
+		hc.SetCallback(svc.healthCheckCallback)
 	}
 
 	return svc
@@ -726,6 +733,7 @@ func (s *Service) upsertService(params *lb.SVC) (bool, lb.ID, error) {
 				logfields.Backends:  params.Backends,
 
 				logfields.ServiceType:                params.Type,
+				logfields.ServiceForwardingMode:      params.ForwardingMode,
 				logfields.ServiceExtTrafficPolicy:    params.ExtTrafficPolicy,
 				logfields.ServiceIntTrafficPolicy:    params.IntTrafficPolicy,
 				logfields.ServiceHealthCheckNodePort: params.HealthCheckNodePort,
@@ -985,6 +993,7 @@ func (s *Service) upsertNodePortHealthService(svc *svcInfo, nodeMeta NodeMetaCol
 	healthCheckSvc := &lb.SVC{
 		Name:             healthCheckSvcName,
 		Type:             svc.svcType,
+		ForwardingMode:   svc.svcForwardingMode,
 		Frontend:         healthCheckFrontend,
 		ExtTrafficPolicy: lb.SVCTrafficPolicyLocal,
 		IntTrafficPolicy: lb.SVCTrafficPolicyLocal,
@@ -1085,6 +1094,7 @@ func (s *Service) UpdateBackendsStateMultiple(svcMapping map[lb.ID]*svcInfo, bac
 						PrevBackendsCount:         len(info.backends),
 						IPv6:                      info.frontend.IsIPv6(),
 						Type:                      info.svcType,
+						ForwardingMode:            info.svcForwardingMode,
 						ExtLocal:                  info.isExtLocal(),
 						IntLocal:                  info.isIntLocal(),
 						Scope:                     info.frontend.L3n4Addr.Scope,
@@ -1421,12 +1431,12 @@ func (s *Service) createSVCInfoIfNotExist(p *lb.SVC) (*svcInfo, bool, bool,
 	//
 	// Note that this logic can be removed once we stop supporting services without protocol.
 	proto := p.Frontend.L3n4Addr.L4Addr.Protocol
-	p.Frontend.L3n4Addr.L4Addr.Protocol = "NONE"
+	p.Frontend.L3n4Addr.L4Addr.Protocol = "ANY"
 
 	backendProtos := []lb.L4Type{}
 	for _, backend := range p.Backends {
 		backendProtos = append(backendProtos, backend.L3n4Addr.L4Addr.Protocol)
-		backend.L3n4Addr.L4Addr.Protocol = "NONE"
+		backend.L3n4Addr.L4Addr.Protocol = "ANY"
 	}
 
 	hash := p.Frontend.Hash()
@@ -1456,8 +1466,9 @@ func (s *Service) createSVCInfoIfNotExist(p *lb.SVC) (*svcInfo, bool, bool,
 			frontend:      p.Frontend,
 			backendByHash: map[string]*lb.Backend{},
 
-			svcType: p.Type,
-			svcName: p.Name,
+			svcType:           p.Type,
+			svcForwardingMode: p.ForwardingMode,
+			svcName:           p.Name,
 
 			sessionAffinity:           p.SessionAffinity,
 			sessionAffinityTimeoutSec: p.SessionAffinityTimeoutSec,
@@ -1493,6 +1504,7 @@ func (s *Service) createSVCInfoIfNotExist(p *lb.SVC) (*svcInfo, bool, bool,
 		prevSessionAffinity = svc.sessionAffinity
 		prevLoadBalancerSourceRanges = svc.loadBalancerSourceRanges
 		svc.svcType = p.Type
+		svc.svcForwardingMode = p.ForwardingMode
 		svc.svcExtTrafficPolicy = p.ExtTrafficPolicy
 		svc.svcIntTrafficPolicy = p.IntTrafficPolicy
 		svc.svcNatPolicy = p.NatPolicy
@@ -1673,6 +1685,7 @@ func (s *Service) upsertServiceIntoLBMaps(svc *svcInfo, isExtLocal, isIntLocal b
 		IPv6:                      v6FE,
 		NatPolicy:                 natPolicy,
 		Type:                      svc.svcType,
+		ForwardingMode:            svc.svcForwardingMode,
 		ExtLocal:                  isExtLocal,
 		IntLocal:                  isIntLocal,
 		Scope:                     svc.frontend.L3n4Addr.Scope,
@@ -1852,6 +1865,7 @@ func (s *Service) restoreServicesLocked(svcBackendsById map[lb.BackendID]struct{
 			backends:            svc.Backends,
 			backendByHash:       map[string]*lb.Backend{},
 			svcType:             svc.Type,
+			svcForwardingMode:   svc.ForwardingMode,
 			svcExtTrafficPolicy: svc.ExtTrafficPolicy,
 			svcIntTrafficPolicy: svc.IntTrafficPolicy,
 			svcNatPolicy:        svc.NatPolicy,
@@ -2114,6 +2128,9 @@ func (s *Service) notifyMonitorServiceUpsert(frontend lb.L3n4AddrID, backends []
 		be = append(be, b)
 	}
 
+	if !option.Config.EnableInternalTrafficPolicy {
+		svcIntTrafficPolicy = lb.SVCTrafficPolicyCluster
+	}
 	msg := monitorAPI.ServiceUpsertMessage(id, fe, be, string(svcType), string(svcExtTrafficPolicy), string(svcIntTrafficPolicy), svcName, svcNamespace)
 	s.monitorAgent.SendEvent(monitorAPI.MessageTypeAgent, msg)
 }

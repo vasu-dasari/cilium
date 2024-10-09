@@ -1063,7 +1063,6 @@ func LoadIPSecKeys(log *slog.Logger, r io.Reader) (int, uint8, error) {
 	scanner.Split(bufio.ScanLines)
 	for scanner.Scan() {
 		var (
-			oldSpi     uint8
 			aeadKey    []byte
 			authKey    []byte
 			esn        bool
@@ -1146,12 +1145,13 @@ func LoadIPSecKeys(log *slog.Logger, r io.Reader) (int, uint8, error) {
 		ipSecKey.Spi = spi
 		ipSecKey.ESN = esn
 
-		if ipSecKeysGlobal[""] != nil {
-			oldSpi = ipSecKeysGlobal[""].Spi
+		if oldKey, ok := ipSecKeysGlobal[""]; ok {
+			if oldKey.Spi == spi {
+				return 0, 0, fmt.Errorf("invalid SPI: changing IPSec keys requires incrementing the key id")
+			}
+			ipSecKeysRemovalTime[oldKey.Spi] = time.Now()
 		}
 		ipSecKeysGlobal[""] = ipSecKey
-
-		ipSecKeysRemovalTime[oldSpi] = time.Now()
 		ipSecCurrentKeySPI = spi
 	}
 	return keyLen, spi, nil
@@ -1415,4 +1415,12 @@ func (skr staleKeyReclaimer) onTimer(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// UnsetTestIPSecKey reinitialize the IPSec key-related variables.
+// This function is for testing purpose only and **must not** be used elsewhere.
+func UnsetTestIPSecKey() {
+	ipSecCurrentKeySPI = 0
+	ipSecKeysGlobal = make(map[string]*ipSecKey)
+	ipSecKeysRemovalTime = make(map[uint8]time.Time)
 }
