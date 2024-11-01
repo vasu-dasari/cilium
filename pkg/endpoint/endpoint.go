@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"testing"
 
 	"github.com/cilium/hive/cell"
 	"github.com/sirupsen/logrus"
@@ -31,6 +30,7 @@ import (
 	"github.com/cilium/cilium/pkg/datapath/link"
 	"github.com/cilium/cilium/pkg/datapath/linux/bandwidth"
 	linuxrouting "github.com/cilium/cilium/pkg/datapath/linux/routing"
+	"github.com/cilium/cilium/pkg/datapath/linux/safenetlink"
 	dptypes "github.com/cilium/cilium/pkg/datapath/types"
 	"github.com/cilium/cilium/pkg/defaults"
 	"github.com/cilium/cilium/pkg/endpoint/regeneration"
@@ -72,6 +72,10 @@ const (
 	// PropertyFakeEndpoint marks the endpoint as being "fake". By "fake" it
 	// means that it doesn't have any datapath bpf programs regenerated.
 	PropertyFakeEndpoint = "property-fake-endpoint"
+
+	// PropertyAtHostNS is used for endpoints that are reached via the host networking
+	// namespace, but have their own IP(s) from the node's pod CIDR range
+	PropertyAtHostNS = "property-at-host-network-namespace"
 
 	// PropertyWithouteBPFDatapath marks the endpoint that doesn't contain a
 	// eBPF datapath program.
@@ -320,6 +324,7 @@ type Endpoint struct {
 
 	// proxyStatisticsMutex is the mutex that must be held to read or write
 	// proxyStatistics.
+	// No other locks may be taken while holding proxyStatisticsMutex.
 	proxyStatisticsMutex lock.RWMutex
 
 	proxy EndpointProxy
@@ -358,11 +363,6 @@ type Endpoint struct {
 	// controllers is the list of async controllers syncing the endpoint to
 	// other resources
 	controllers *controller.Manager
-
-	// realizedRedirects maps the ID of each proxy redirect that has been
-	// successfully added into a proxy for this endpoint, to the redirect's
-	// proxy port number.
-	realizedRedirects atomic.Pointer[map[string]uint16]
 
 	// ctCleaned indicates whether the conntrack table has already been
 	// cleaned when this endpoint was first created
@@ -422,13 +422,6 @@ type Endpoint struct {
 	NetNsCookie uint64
 }
 
-func (e *Endpoint) GetRealizedRedirects() (redirects map[string]uint16) {
-	if p := e.realizedRedirects.Load(); p != nil {
-		redirects = *p
-	}
-	return redirects
-}
-
 func (e *Endpoint) GetReporter(name string) cell.Health {
 	if e.reporterScope == nil {
 		_, h := cell.NewSimpleHealth()
@@ -466,7 +459,7 @@ type namedPortsGetter interface {
 }
 
 type policyRepoGetter interface {
-	GetPolicyRepository() *policy.Repository
+	GetPolicyRepository() policy.PolicyRepository
 }
 
 // EndpointSyncControllerName returns the controller name to synchronize
@@ -497,6 +490,10 @@ func (e *Endpoint) GetIfIndex() int {
 // LXCMac returns the LXCMac for this endpoint.
 func (e *Endpoint) LXCMac() mac.MAC {
 	return e.mac
+}
+
+func (e *Endpoint) IsAtHostNS() bool {
+	return e.isProperty(PropertyAtHostNS)
 }
 
 func (e *Endpoint) IsHost() bool {
@@ -544,7 +541,9 @@ func (e *Endpoint) waitForProxyCompletions(proxyWaitGroup *completion.WaitGroup)
 }
 
 // NewTestEndpointWithState creates a new endpoint useful for testing purposes
-func NewTestEndpointWithState(_ testing.TB, owner regeneration.Owner, policyGetter policyRepoGetter, namedPortsGetter namedPortsGetter, proxy EndpointProxy, allocator cache.IdentityAllocator, ID uint16, state State) *Endpoint {
+//
+// Note: This function is intended for testing purposes only and should not be used in production code.
+func NewTestEndpointWithState(owner regeneration.Owner, policyGetter policyRepoGetter, namedPortsGetter namedPortsGetter, proxy EndpointProxy, allocator cache.IdentityAllocator, ID uint16, state State) *Endpoint {
 	endpointQueueName := "endpoint-" + strconv.FormatUint(uint64(ID), 10)
 	ep := createEndpoint(owner, policyGetter, namedPortsGetter, proxy, allocator, ID, "")
 	ep.SetPropertyValue(PropertyFakeEndpoint, true)
@@ -621,10 +620,19 @@ func CreateIngressEndpoint(owner regeneration.Owner, policyGetter policyRepoGett
 	ep.DatapathConfiguration = NewDatapathConfiguration()
 
 	ep.isIngress = true
+
 	// An ingress endpoint is defined without a veth interface and no bpf
 	// programs or maps are created for it. Thus, we will set its properties
 	// to not have a bpf policy map nor a bpf datapath.
+
+	// Ingress endpoint is reachable via the host networking namespace
+	// Host delivery flag is set in lxcmap
+	ep.properties[PropertyAtHostNS] = true
+
+	// Ingress endpoint has no bpf policy maps
 	ep.properties[PropertySkipBPFPolicy] = true
+
+	// Ingress endpoint has no bpf programs
 	ep.properties[PropertyWithouteBPFDatapath] = true
 
 	// node.GetIngressIPv4 has been parsed with net.ParseIP() and may be in IPv4 mapped IPv6
@@ -660,13 +668,13 @@ func (e *Endpoint) GetID() uint64 {
 	return uint64(e.ID)
 }
 
-// GetLabels returns the labels as slice
-func (e *Endpoint) GetLabels() []string {
+// GetLabels returns the labels.
+func (e *Endpoint) GetLabels() labels.Labels {
 	if e.SecurityIdentity == nil {
-		return []string{}
+		return labels.Labels{}
 	}
 
-	return e.SecurityIdentity.Labels.GetModel()
+	return e.SecurityIdentity.Labels
 }
 
 // GetSecurityIdentity returns the security identity of the endpoint. It assumes
@@ -788,7 +796,7 @@ func (e *Endpoint) Allows(id identity.NumericIdentity) bool {
 
 	keyToLookup := policy.IngressKey().WithIdentity(id)
 
-	v, ok := e.desiredPolicy.GetPolicyMap().Get(keyToLookup)
+	v, ok := e.desiredPolicy.Get(keyToLookup)
 	return ok && !v.IsDeny
 }
 
@@ -1194,24 +1202,22 @@ type DeleteConfig struct {
 // endpoints which failed to be restored. Any cleanup routine of leaveLocked()
 // which depends on kvstore connectivity must be protected by a flag in
 // DeleteConfig and the restore logic must opt-out of it.
-func (e *Endpoint) leaveLocked(proxyWaitGroup *completion.WaitGroup, conf DeleteConfig) []error {
+func (e *Endpoint) leaveLocked(conf DeleteConfig) []error {
 	errs := []error{}
 
 	// Remove policy references from shared policy structures
 	e.desiredPolicy.Detach()
-	e.realizedPolicy.Detach()
+	// Passing a new map of nil will purge all redirects
+	e.removeOldRedirects(nil, e.desiredPolicy.Redirects)
+
+	if e.realizedPolicy != e.desiredPolicy {
+		e.realizedPolicy.Detach()
+		// Passing a new map of nil will purge all redirects
+		e.removeOldRedirects(nil, e.realizedPolicy.Redirects)
+	}
 
 	// Remove restored rules of cleaned endpoint
 	e.owner.RemoveRestoredDNSRules(e.ID)
-
-	realizedRedirects := e.GetRealizedRedirects()
-	if e.SecurityIdentity != nil && len(realizedRedirects) > 0 {
-		// Passing a new map of nil will purge all redirects
-		finalize, _ := e.removeOldRedirects(nil, realizedRedirects, proxyWaitGroup)
-		if finalize != nil {
-			finalize()
-		}
-	}
 
 	if e.policyMap != nil {
 		if err := e.policyMap.Close(); err != nil {
@@ -2529,17 +2535,8 @@ func (e *Endpoint) Delete(conf DeleteConfig) []error {
 		}
 	}
 
-	completionCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	proxyWaitGroup := completion.NewWaitGroup(completionCtx)
-
-	errs = append(errs, e.leaveLocked(proxyWaitGroup, conf)...)
+	errs = append(errs, e.leaveLocked(conf)...)
 	e.unlock()
-
-	err := e.waitForProxyCompletions(proxyWaitGroup)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("unable to remove proxy redirects: %w", err))
-	}
-	cancel()
 
 	return errs
 }
@@ -2547,7 +2544,7 @@ func (e *Endpoint) Delete(conf DeleteConfig) []error {
 // setDown sets the Endpoint's underlying interface down. If the interface
 // cannot be retrieved, returns nil.
 func (e *Endpoint) setDown() error {
-	link, err := netlink.LinkByName(e.HostInterface())
+	link, err := safenetlink.LinkByName(e.HostInterface())
 	if errors.As(err, &netlink.LinkNotFoundError{}) {
 		// No interface, nothing to do.
 		return nil

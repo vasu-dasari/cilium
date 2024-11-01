@@ -129,6 +129,12 @@ Users (Alphabetically)
       L: https://bitnami.com/stack/cilium
       Q: @carrodher
 
+    * N: BMC Software
+      D: Cilium can be optionally used in BMC Helix Innovaton Suite and BMC IT Operations Management On Premise
+      U: CNI, Hubble
+      L: https://www.bmc.com
+      Q: @ryebridge
+      
     * N: ByteDance
       D: ByteDance is using Cilium as CNI plug-in for self-hosted Kubernetes.
       U: CNI, Networking
@@ -233,6 +239,11 @@ Users (Alphabetically)
       D: DigitalOcean is using Cilium as the CNI for Digital Ocean's managed Kubernetes Services (DOKS)
       U: Networking and network policy
       L: https://github.com/digitalocean/DOKS
+
+    * N: ECCO Data and AI
+      D: ECCO Data and AI is using Cilium as CNI in all their clusters and environments (EKS in AWS).
+      U: CNI, IPv6 networking, Service Load Balancing and Cluster Mesh
+      L: https://github.com/SneaksAndData
 
     * N: Edgeless Systems
       D: Edgeless Systems is using Cilium as the CNI for Edgeless System's Confidential Kubernetes Distribution (Constellation)
@@ -383,6 +394,12 @@ Users (Alphabetically)
       U: CNI, Networking, Hubble, kube-proxy replacement, network policy
       L: https://kilo.squat.ai/
       Q: @squat, @arpagon
+
+    * N: Koyeb
+      D: Koyeb hosts microVMs on its own servers and uses Cilium to power a mesh in between those
+      U: Networking, policies inside a non-Kubernetes environment
+      L: https://www.koyeb.com/blog/70-faster-deployments-and-high-performance-private-network
+      Q: @koyeb on Twitter / https://community.koyeb.com/
 
     * N: kOps
       D: kOps is using Cilium as one of the supported CNIs

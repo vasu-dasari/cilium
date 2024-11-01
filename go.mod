@@ -9,25 +9,25 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.9.24
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.13
 	github.com/Azure/go-autorest/autorest/to v0.4.0
-	github.com/aliyun/alibaba-cloud-sdk-go v1.63.23
-	github.com/aws/aws-sdk-go-v2 v1.32.0
-	github.com/aws/aws-sdk-go-v2/config v1.27.41
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.15
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.181.0
+	github.com/aliyun/alibaba-cloud-sdk-go v1.63.34
+	github.com/aws/aws-sdk-go-v2 v1.32.2
+	github.com/aws/aws-sdk-go-v2/config v1.28.0
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.17
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.183.0
 	github.com/aws/smithy-go v1.22.0
 	github.com/blang/semver/v4 v4.0.0
-	github.com/cilium/charts v0.0.0-20241006222739-d4ea3601d819
+	github.com/cilium/charts v0.0.0-20241015090923-1f4c1b5ac12a
 	github.com/cilium/coverbee v0.3.3-0.20240723084546-664438750fce
 	github.com/cilium/deepequal-gen v0.0.0-20231116094812-0d6c075c335f
 	github.com/cilium/dns v1.1.51-0.20240603182237-af788769786a
 	github.com/cilium/ebpf v0.16.0
 	github.com/cilium/endpointslice-controller v0.0.0-20240409203012-75cb5d61db1b
 	github.com/cilium/fake v0.6.1
-	github.com/cilium/hive v0.0.0-20240926131619-aa37668760f2
-	github.com/cilium/linters v0.0.0-20241001072509-4201f4cc97b7
+	github.com/cilium/hive v0.0.0-20241021113747-bb8f3c0bede4
+	github.com/cilium/linters v0.1.0
 	github.com/cilium/lumberjack/v2 v2.3.0
 	github.com/cilium/proxy v0.0.0-20240909042906-ae435a5bef38
-	github.com/cilium/statedb v0.3.0
+	github.com/cilium/statedb v0.3.2
 	github.com/cilium/stream v0.0.0-20240816054136-71321e385273
 	github.com/cilium/workerpool v1.2.0
 	github.com/cloudflare/cfssl v1.6.5
@@ -37,7 +37,7 @@ require (
 	github.com/docker/docker v27.3.1+incompatible
 	github.com/docker/libnetwork v0.8.0-dev.2.0.20210525090646-64b7a4574d14
 	github.com/evanphx/json-patch v5.9.0+incompatible
-	github.com/fatih/color v1.17.0
+	github.com/fatih/color v1.18.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-logr/logr v1.4.2
 	github.com/go-openapi/errors v0.22.0
@@ -76,7 +76,7 @@ require (
 	github.com/osrg/gobgp/v3 v3.29.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
-	github.com/prometheus/client_golang v1.20.4
+	github.com/prometheus/client_golang v1.20.5
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.60.0
 	github.com/prometheus/procfs v0.15.1
@@ -94,13 +94,13 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
-	github.com/vishvananda/netlink v1.3.0
+	github.com/vishvananda/netlink v1.3.1-0.20241022031324-976bd8de7d81
 	github.com/vishvananda/netns v0.0.4
 	go.etcd.io/etcd/api/v3 v3.5.16
 	go.etcd.io/etcd/client/pkg/v3 v3.5.16
 	go.etcd.io/etcd/client/v3 v3.5.16
-	go.opentelemetry.io/otel v1.30.0
-	go.opentelemetry.io/otel/trace v1.30.0
+	go.opentelemetry.io/otel v1.31.0
+	go.opentelemetry.io/otel/trace v1.31.0
 	go.uber.org/goleak v1.3.0
 	go.uber.org/zap v1.27.0
 	go.universe.tf/metallb v0.11.0
@@ -114,21 +114,22 @@ require (
 	golang.org/x/time v0.7.0
 	golang.org/x/tools v0.26.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20230429144221-925a1e7659e6
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240930140551-af27646dc61f
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38
 	google.golang.org/grpc v1.67.1
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/protobuf v1.35.1
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/yaml.v3 v3.0.1
-	helm.sh/helm/v3 v3.16.1
-	k8s.io/api v0.31.1
-	k8s.io/apiextensions-apiserver v0.31.1
-	k8s.io/apimachinery v0.31.1
-	k8s.io/cli-runtime v0.31.1
-	k8s.io/client-go v0.31.1
-	k8s.io/code-generator v0.31.1
-	k8s.io/component-base v0.31.1
+	helm.sh/helm/v3 v3.16.2
+	k8s.io/api v0.31.2
+	k8s.io/apiextensions-apiserver v0.31.2
+	k8s.io/apimachinery v0.31.2
+	k8s.io/cli-runtime v0.31.2
+	k8s.io/client-go v0.31.2
+	k8s.io/code-generator v0.31.2
+	k8s.io/component-base v0.31.2
 	k8s.io/endpointslice v0.31.1
 	k8s.io/klog/v2 v2.130.1
+	k8s.io/kubectl v0.31.1
 	k8s.io/utils v0.0.0-20240921022957-49e7df575cb6
 	sigs.k8s.io/controller-runtime v0.19.0
 	sigs.k8s.io/controller-tools v0.16.3
@@ -158,15 +159,15 @@ require (
 	github.com/alecthomas/participle/v2 v2.1.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
-	github.com/aws/aws-sdk-go-v2/credentials v1.17.39 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.19 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.19 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.41 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.21 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.21 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.24.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.32.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.24.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.2 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.32.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -299,7 +300,7 @@ require (
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.22.0 // indirect
-	go.opentelemetry.io/otel/metric v1.30.0 // indirect
+	go.opentelemetry.io/otel/metric v1.31.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	go.uber.org/atomic v1.11.0 // indirect
@@ -316,11 +317,10 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gotest.tools/v3 v3.5.0 // indirect
-	k8s.io/apiserver v0.31.1 // indirect
+	k8s.io/apiserver v0.31.2 // indirect
 	k8s.io/gengo v0.0.0-20230829151522-9cce18d56c01 // indirect
 	k8s.io/gengo/v2 v2.0.0-20240228010128-51d4e06bde70 // indirect
 	k8s.io/kube-openapi v0.0.0-20240423202451-8948a665c108 // indirect
-	k8s.io/kubectl v0.31.0 // indirect
 	oras.land/oras-go v1.2.5 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/kustomize/api v0.17.2 // indirect

@@ -1,12 +1,12 @@
 # Copyright Authors of Cilium
 # SPDX-License-Identifier: Apache-2.0
 
-ARG CILIUM_BUILDER_IMAGE=quay.io/cilium/cilium-builder:f5be233da8726ac46f5df9d6774be4c28063b058@sha256:4c310d92f42cbfd7f742c5c74396ddab18073aba238257212bbaf55fee1019e8
-ARG CILIUM_RUNTIME_IMAGE=quay.io/cilium/cilium-runtime:bc3b807912f1ad5f683d2c1bc580fa1284f76fbf@sha256:7e8141dc98c8ab933f440461e2850f0294a5df04292052c8e8c1f40d378538f7
+ARG CILIUM_BUILDER_IMAGE=quay.io/cilium/cilium-builder:2f4c35682cd0e688697385c430c49082b50e0d72@sha256:ce77dd34bfbd8cefe220858d0ba8ab369f07cd5afc3fd189f2c4eb78ef643669
+ARG CILIUM_RUNTIME_IMAGE=quay.io/cilium/cilium-runtime:853efd3710875f6286c555ad436c57d91c3ba9f5@sha256:75a4befc6cead36979e8bcf4f6eba0cfc01f6eba220fd3eae61b8ae0eb516883
 #
 # cilium-envoy from github.com/cilium/proxy
 #
-ARG CILIUM_ENVOY_IMAGE=quay.io/cilium/cilium-envoy:v1.30.6-1728346971-e2dfcc576d5152c967479115e0e0a3905be766bb@sha256:8ce0d0514a70a4d9141d946491c9bfe5fd479c1992ab6ef06f9af99ab938d1d9
+ARG CILIUM_ENVOY_IMAGE=quay.io/cilium/cilium-envoy:v1.30.7-1730239547-90b7953f5b6ffe617fa630d42ea6d5b65fba1b9e@sha256:d7db101d856c478a497fc79fab3ce3c732221e80fdf37bfe001672acb155d164
 
 FROM ${CILIUM_ENVOY_IMAGE} AS cilium-envoy
 
@@ -37,7 +37,7 @@ WORKDIR /go/src/github.com/cilium/cilium
 RUN --mount=type=bind,readwrite,target=/go/src/github.com/cilium/cilium \
     --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/go/pkg \
-    make GOARCH=${TARGETARCH} DESTDIR=/tmp/install/${TARGETOS}/${TARGETARCH} PKG_BUILD=1 ${MODIFIERS} \
+    make GOARCH=${TARGETARCH} DESTDIR=/tmp/install/${TARGETOS}/${TARGETARCH} PKG_BUILD=1 $(echo $MODIFIERS | tr -d '"') \
     build-container install-container-binary
 
 RUN --mount=type=bind,readwrite,target=/go/src/github.com/cilium/cilium \
@@ -46,7 +46,7 @@ RUN --mount=type=bind,readwrite,target=/go/src/github.com/cilium/cilium \
     # install-bash-completion will execute the bash_completion script. It is
     # fine to run this with same architecture as BUILDARCH since the output of
     # bash_completion is the same for both architectures.
-    make GOARCH=${BUILDARCH} DESTDIR=/tmp/install/${TARGETOS}/${TARGETARCH} PKG_BUILD=1 ${MODIFIERS} \
+    make GOARCH=${BUILDARCH} DESTDIR=/tmp/install/${TARGETOS}/${TARGETARCH} PKG_BUILD=1 $(echo $MODIFIERS | tr -d '"') \
     install-bash-completion licenses-all && \
     mv LICENSE.all /tmp/install/${TARGETOS}/${TARGETARCH}/LICENSE.all && \
     mkdir -p /tmp/hubble/${TARGETOS}/${TARGETARCH} && \
@@ -64,7 +64,7 @@ RUN set -xe && \
       -exec sh -c \
         'filename=$(basename ${0}) && \
          objcopy --only-keep-debug ${0} ${0}.debug && \
-         if [ "$NOSTRIP" != "1" ] ; then objcopy --strip-all ${0} && (cd $(dirname ${0}) && objcopy --add-gnu-debuglink=${filename}.debug ${filename}) ; fi && \
+         if ! echo "$MODIFIERS" | grep "NOSTRIP=1" ; then objcopy --strip-all ${0} && (cd $(dirname ${0}) && objcopy --add-gnu-debuglink=${filename}.debug ${filename}) ; fi && \
          mv -v ${0}.debug ${D}/${filename}.debug' \
       {} \;
 

@@ -108,6 +108,10 @@
      - Security context to be added to spire agent pods. SecurityContext holds pod-level security attributes and common container settings. ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
      - object
      - ``{}``
+   * - :spelling:ignore:`authentication.mutual.spire.install.agent.priorityClassName`
+     - The priority class to use for the spire agent
+     - string
+     - ``""``
    * - :spelling:ignore:`authentication.mutual.spire.install.agent.resources`
      - container resource limits & requests
      - object
@@ -196,6 +200,10 @@
      - Security context to be added to spire server pods. SecurityContext holds pod-level security attributes and common container settings. ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-the-security-context-for-a-pod
      - object
      - ``{}``
+   * - :spelling:ignore:`authentication.mutual.spire.install.server.priorityClassName`
+     - The priority class to use for the spire server
+     - string
+     - ``""``
    * - :spelling:ignore:`authentication.mutual.spire.install.server.resources`
      - container resource limits & requests
      - object
@@ -368,6 +376,10 @@
      - Configure the maximum number of service entries in the load balancer maps.
      - int
      - ``65536``
+   * - :spelling:ignore:`bpf.lbSourceRangeAllTypes`
+     - Enable loadBalancerSourceRanges CIDR filtering for all service types, not just LoadBalancer services. The corresponding NodePort and ClusterIP (if enabled for cluster-external traffic) will also apply the CIDR filter.
+     - bool
+     - ``false``
    * - :spelling:ignore:`bpf.mapDynamicSizeRatio`
      - Configure auto-sizing for all BPF maps based on available memory. ref: https://docs.cilium.io/en/stable/network/ebpf/maps/
      - float64
@@ -427,7 +439,7 @@
    * - :spelling:ignore:`certgen`
      - Configure certificate generation for Hubble integration. If hubble.tls.auto.method=cronJob, these values are used for the Kubernetes CronJob which will be scheduled regularly to (re)generate any certificates not provided manually.
      - object
-     - ``{"affinity":{},"annotations":{"cronJob":{},"job":{}},"extraVolumeMounts":[],"extraVolumes":[],"image":{"digest":"sha256:ab6b1928e9c5f424f6b0f51c68065b9fd85e2f8d3e5f21fbd1a3cb27e6fb9321","override":null,"pullPolicy":"Always","repository":"quay.io/cilium/certgen","tag":"v0.2.1","useDigest":true},"podLabels":{},"tolerations":[],"ttlSecondsAfterFinished":1800}``
+     - ``{"affinity":{},"annotations":{"cronJob":{},"job":{}},"extraVolumeMounts":[],"extraVolumes":[],"generateCA":true,"image":{"digest":"sha256:ab6b1928e9c5f424f6b0f51c68065b9fd85e2f8d3e5f21fbd1a3cb27e6fb9321","override":null,"pullPolicy":"Always","repository":"quay.io/cilium/certgen","tag":"v0.2.1","useDigest":true},"nodeSelector":{},"podLabels":{},"priorityClassName":"","tolerations":[],"ttlSecondsAfterFinished":1800}``
    * - :spelling:ignore:`certgen.affinity`
      - Affinity for certgen
      - object
@@ -444,10 +456,22 @@
      - Additional certgen volumes.
      - list
      - ``[]``
+   * - :spelling:ignore:`certgen.generateCA`
+     - When set to true the certificate authority secret is created.
+     - bool
+     - ``true``
+   * - :spelling:ignore:`certgen.nodeSelector`
+     - Node selector for certgen ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
+     - object
+     - ``{}``
    * - :spelling:ignore:`certgen.podLabels`
      - Labels to be added to hubble-certgen pods
      - object
      - ``{}``
+   * - :spelling:ignore:`certgen.priorityClassName`
+     - Priority class for certgen ref: https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/#priorityclass
+     - string
+     - ``""``
    * - :spelling:ignore:`certgen.tolerations`
      - Node tolerations for pod assignment on nodes with taints ref: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/
      - list
@@ -944,6 +968,10 @@
      - Configure a custom list of possible configuration override sources The default is "config-map:cilium-config,cilium-node-config". For supported values, see the help text for the build-config subcommand. Note that this value should be a comma-separated string.
      - string
      - ``nil``
+   * - :spelling:ignore:`daemon.enableSourceIPVerification`
+     - enableSourceIPVerification is a boolean flag to enable or disable the Source IP verification of endpoints. This flag is useful when Cilium is chained with other CNIs.  By default, this functionality is enabled
+     - bool
+     - ``true``
    * - :spelling:ignore:`daemon.runPath`
      - Configure where Cilium runtime state should be stored.
      - string
@@ -1259,7 +1287,7 @@
    * - :spelling:ignore:`envoy.image`
      - Envoy container image.
      - object
-     - ``{"digest":"sha256:8ce0d0514a70a4d9141d946491c9bfe5fd479c1992ab6ef06f9af99ab938d1d9","override":null,"pullPolicy":"Always","repository":"quay.io/cilium/cilium-envoy","tag":"v1.30.6-1728346971-e2dfcc576d5152c967479115e0e0a3905be766bb","useDigest":true}``
+     - ``{"digest":"sha256:d7db101d856c478a497fc79fab3ce3c732221e80fdf37bfe001672acb155d164","override":null,"pullPolicy":"Always","repository":"quay.io/cilium/cilium-envoy","tag":"v1.30.7-1730239547-90b7953f5b6ffe617fa630d42ea6d5b65fba1b9e","useDigest":true}``
    * - :spelling:ignore:`envoy.livenessProbe.failureThreshold`
      - failure threshold of liveness probe
      - int
@@ -1273,9 +1301,13 @@
      - string
      - Defaults to the default log level of the Cilium Agent - ``info``
    * - :spelling:ignore:`envoy.log.format`
-     - The format string to use for laying out the log message metadata of Envoy.
+     - The format string to use for laying out the log message metadata of Envoy. If specified, Envoy will use text format output. This setting is mutually exclusive with envoy.log.format_json.
      - string
      - ``"[%Y-%m-%d %T.%e][%t][%l][%n] [%g:%#] %v"``
+   * - :spelling:ignore:`envoy.log.format_json`
+     - The JSON logging format to use for Envoy. This setting is mutually exclusive with envoy.log.format. ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/bootstrap/v3/bootstrap.proto#envoy-v3-api-field-config-bootstrap-v3-bootstrap-applicationlogconfig-logformat-json-format
+     - string
+     - ``nil``
    * - :spelling:ignore:`envoy.log.path`
      - Path to a separate Envoy log file, if any. Defaults to /dev/stdout.
      - string
@@ -1979,19 +2011,19 @@
    * - :spelling:ignore:`hubble.tls`
      - TLS configuration for Hubble
      - object
-     - ``{"auto":{"certManagerIssuerRef":{},"certValidityDuration":1095,"enabled":true,"method":"helm","schedule":"0 0 1 */4 *"},"enabled":true,"server":{"cert":"","existingSecret":"","extraDnsNames":[],"extraIpAddresses":[],"key":""}}``
+     - ``{"auto":{"certManagerIssuerRef":{},"certValidityDuration":365,"enabled":true,"method":"helm","schedule":"0 0 1 */4 *"},"enabled":true,"server":{"cert":"","existingSecret":"","extraDnsNames":[],"extraIpAddresses":[],"key":""}}``
    * - :spelling:ignore:`hubble.tls.auto`
      - Configure automatic TLS certificates generation.
      - object
-     - ``{"certManagerIssuerRef":{},"certValidityDuration":1095,"enabled":true,"method":"helm","schedule":"0 0 1 */4 *"}``
+     - ``{"certManagerIssuerRef":{},"certValidityDuration":365,"enabled":true,"method":"helm","schedule":"0 0 1 */4 *"}``
    * - :spelling:ignore:`hubble.tls.auto.certManagerIssuerRef`
      - certmanager issuer used when hubble.tls.auto.method=certmanager.
      - object
      - ``{}``
    * - :spelling:ignore:`hubble.tls.auto.certValidityDuration`
-     - Generated certificates validity duration in days.
+     - Generated certificates validity duration in days.  Defaults to 365 days (1 year) because MacOS does not accept self-signed certificates with expirations > 825 days.
      - int
-     - ``1095``
+     - ``365``
    * - :spelling:ignore:`hubble.tls.auto.enabled`
      - Auto-generate certificates. When set to true, automatically generate a CA and certificates to enable mTLS between Hubble server and Hubble Relay instances. If set to false, the certs for Hubble server need to be provided by setting appropriate values below.
      - bool
@@ -2509,7 +2541,7 @@
      - string
      - ``"disabled"``
    * - :spelling:ignore:`loadBalancer.experimental`
-     - experimental enables support for the experimental load-balancing  control-plane.
+     - experimental enables support for the experimental load-balancing control-plane.
      - bool
      - ``false``
    * - :spelling:ignore:`loadBalancer.l7`

@@ -5,10 +5,10 @@ package lbipam
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/cilium/hive/cell"
 	"github.com/cilium/hive/job"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 
 	cilium_api_v2alpha1 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2alpha1"
@@ -48,7 +48,7 @@ func (lc lbipamConfig) Flags(flags *pflag.FlagSet) {
 type lbipamCellParams struct {
 	cell.In
 
-	Logger logrus.FieldLogger
+	Logger *slog.Logger
 
 	LC       cell.Lifecycle
 	JobGroup job.Group
@@ -88,6 +88,7 @@ func newLBIPAMCell(params lbipamCellParams) *LBIPAM {
 		lbClasses:    lbClasses,
 		ipv4Enabled:  option.Config.IPv4Enabled(),
 		ipv6Enabled:  option.Config.IPv6Enabled(),
+		lbProtoDiff:  option.Config.LBProtoDiffEnabled(),
 		poolClient:   params.Clientset.CiliumV2alpha1().CiliumLoadBalancerIPPools(),
 		svcClient:    params.Clientset.Slim().CoreV1(),
 		jobGroup:     params.JobGroup,

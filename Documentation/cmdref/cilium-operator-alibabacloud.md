@@ -54,10 +54,12 @@ cilium-operator-alibabacloud [flags]
       --enable-k8s                                           Enable the k8s clientset (default true)
       --enable-k8s-api-discovery                             Enable discovery of Kubernetes API groups and resources with the discovery API
       --enable-k8s-endpoint-slice                            Enables k8s EndpointSlice feature in Cilium if the k8s cluster supports it (default true)
+      --enable-l7-proxy                                      Enable L7 proxy for L7 policy enforcement (default true)
       --enable-lb-ipam                                       Enable LB IPAM (default true)
       --enable-metrics                                       Enable Prometheus metrics
       --enable-node-ipam                                     Enable Node IPAM
       --enable-node-port                                     Enable NodePort type services by Cilium
+      --enable-node-selector-labels                          Enable use of node label based identity
       --enforce-ingress-https                                Enforces https for host having matching TLS host in Ingress. Incoming traffic to http listener will return 308 http error code with respective location in header. (default true)
       --gateway-api-hostnetwork-enabled                      Exposes Gateway listeners on the host network.
       --gateway-api-hostnetwork-nodelabelselector string     Label selector that matches the nodes where the gateway listeners should be exposed. It's a list of comma-separated key-value label pairs. e.g. 'kubernetes.io/os=linux,kubernetes.io/hostname=kind-worker'
@@ -99,6 +101,7 @@ cilium-operator-alibabacloud [flags]
       --leader-election-retry-period duration                Duration that LeaderElector clients should wait between retries of the actions (default 2s)
       --limit-ipam-api-burst int                             Upper burst limit when accessing external APIs (default 20)
       --limit-ipam-api-qps float                             Queries per second limit when accessing external IPAM APIs (default 4)
+      --loadbalancer-l7 string                               Enable L7 loadbalancer capabilities for services via L7 proxy. Applicable values: envoy
       --loadbalancer-l7-algorithm string                     Default LB algorithm for services that do not specify related annotation (default "round_robin")
       --loadbalancer-l7-ports strings                        List of service ports that will be automatically redirected to backend.
       --log-driver strings                                   Logging endpoints to use for example syslog

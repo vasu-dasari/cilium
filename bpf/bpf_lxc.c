@@ -668,7 +668,7 @@ ct_recreate6:
 		ep = lookup_ip6_endpoint(ip6);
 		if (ep) {
 #if defined(ENABLE_HOST_ROUTING) || defined(ENABLE_ROUTING)
-			if (ep->flags & ENDPOINT_F_HOST) {
+			if (ep->flags & ENDPOINT_MASK_HOST_DELIVERY) {
 				if (is_defined(ENABLE_ROUTING)) {
 # ifdef HOST_IFINDEX
 					goto to_host;
@@ -718,10 +718,14 @@ ct_recreate6:
 		ret = encap_and_redirect_lxc(ctx, tunnel_endpoint, 0, 0, encrypt_key,
 					     &key, SECLABEL_IPV6, *dst_sec_identity,
 					     &trace);
-		if (ret == CTX_ACT_OK)
+		switch (ret) {
+		case CTX_ACT_OK:
 			goto encrypt_to_stack;
-		else if (ret != DROP_NO_TUNNEL_ENDPOINT)
+		case DROP_NO_TUNNEL_ENDPOINT:
+			break;
+		default:
 			return ret;
+		}
 	}
 #endif
 	if (is_defined(ENABLE_HOST_ROUTING)) {
@@ -1174,7 +1178,7 @@ ct_recreate4:
 		ep = __lookup_ip4_endpoint(daddr);
 		if (ep) {
 #if defined(ENABLE_HOST_ROUTING) || defined(ENABLE_ROUTING)
-			if (ep->flags & ENDPOINT_F_HOST) {
+			if (ep->flags & ENDPOINT_MASK_HOST_DELIVERY) {
 				if (is_defined(ENABLE_ROUTING)) {
 # ifdef HOST_IFINDEX
 					goto to_host;
@@ -1260,27 +1264,24 @@ skip_vtep:
 		ret = encap_and_redirect_lxc(ctx, tunnel_endpoint, ip4->saddr,
 					     ip4->daddr, encrypt_key, &key,
 					     SECLABEL_IPV4, *dst_sec_identity, &trace);
-		if (ret == DROP_NO_TUNNEL_ENDPOINT)
-			goto pass_to_stack;
-		/* If not redirected noteably due to IPSEC then pass up to stack
-		 * for further processing.
-		 */
-		else if (ret == CTX_ACT_OK)
+		switch (ret) {
+		case CTX_ACT_OK:
+			/* IPsec, pass up to stack for XFRM processing. */
 			goto encrypt_to_stack;
+		case DROP_NO_TUNNEL_ENDPOINT:
+			/* Deliver via native device. */
+			break;
 #ifdef ENABLE_CLUSTER_AWARE_ADDRESSING
-		/* When we redirect, put cluster_id into mark */
-		else if (ret == CTX_ACT_REDIRECT) {
+		case CTX_ACT_REDIRECT:
 			ctx_set_cluster_id_mark(ctx, cluster_id);
+			fallthrough;
+#endif
+		default:
 			return ret;
 		}
-#endif
-		/* This is either redirect by encap code or an error has
-		 * occurred either way return and stack will consume ctx.
-		 */
-		else
-			return ret;
 	}
 #endif /* TUNNEL_MODE || ENABLE_HIGH_SCALE_IPCACHE */
+
 	if (is_defined(ENABLE_HOST_ROUTING)) {
 		int oif = 0;
 

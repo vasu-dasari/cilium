@@ -325,7 +325,9 @@ struct tunnel_value {
 	__u16 pad;
 } __packed;
 
-#define ENDPOINT_F_HOST		1 /* Special endpoint representing local host */
+#define ENDPOINT_F_HOST			1 /* Special endpoint representing local host */
+#define ENDPOINT_F_ATHOSTNS		2 /* Endpoint located at the host networking namespace */
+#define ENDPOINT_MASK_HOST_DELIVERY	(ENDPOINT_F_HOST | ENDPOINT_F_ATHOSTNS)
 
 /* Value of endpoint map */
 struct endpoint_info {
@@ -394,11 +396,10 @@ struct policy_key {
 struct policy_entry {
 	__be16		proxy_port;
 	__u8		deny:1,
-			pad:7;
+			reserved:2, /* bits used in Cilium 1.16, keep unused for Cilium 1.17 */
+			lpm_prefix_length:5; /* map key protocol and dport prefix length */
 	__u8		auth_type;
-	__u8		lpm_prefix_length; /* map key protocol and dport prefix length */
-	__u8		pad1;
-	__u16		pad2;
+	__u32		pad1;
 	__u64		packets;
 	__u64		bytes;
 };
@@ -508,6 +509,12 @@ struct node_key {
 	};
 };
 
+struct node_value {
+	__u16 id;
+	__u8  spi;
+	__u8  pad;
+};
+
 enum {
 	POLICY_INGRESS = 1,
 	POLICY_EGRESS = 2,
@@ -555,7 +562,7 @@ enum {
 	.type		= (t),		\
 	.subtype	= (s),		\
 	.source		= EVENT_SOURCE,	\
-	.hash		= get_hash_recalc(ctx)
+	.hash		= get_hash(ctx)   /* Avoids hash recalculation, assumes hash has been already calculated */
 
 #define __notify_pktcap_hdr(o, c)	\
 	.len_orig	= (o),		\

@@ -319,6 +319,9 @@ communicating via the proxy must reconnect to re-establish connections.
   ``--mtu`` agent flag or ``mtu`` option in CNI configuration.
 * Support for L7 protocol visibility using Pod annotations (``policy.cilium.io/proxy-visibility``),
   deprecated since v1.15, has been removed.
+* The Cilium cluster name validation cannot be bypassed anymore, both for the local and
+  remote clusters. The cluster name is strictly enforced to consist of at most 32 lower
+  case alphanumeric characters and '-', start and end with an alphanumeric character.
 
 Removed Options
 ~~~~~~~~~~~~~~~
@@ -341,6 +344,9 @@ Helm Options
   ``hubble.ui.tls.client.cert``, and ``hubble.ui.tls.client.key`` have been
   deprecated in favor of the associated ``existingSecret`` options and will be
   removed in a future release.
+* The default value of ``hubble.tls.auto.certValidityDuration`` has been
+  lowered from 1095 days to 365 days because recent versions of MacOS will fail
+  to validate certificates with expirations longer than 825 days.
 
 Agent Options
 ~~~~~~~~~~~~~

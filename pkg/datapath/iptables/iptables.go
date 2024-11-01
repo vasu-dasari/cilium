@@ -31,6 +31,7 @@ import (
 	"github.com/cilium/cilium/pkg/datapath/linux/linux_defaults"
 	"github.com/cilium/cilium/pkg/datapath/linux/modules"
 	"github.com/cilium/cilium/pkg/datapath/linux/route"
+	"github.com/cilium/cilium/pkg/datapath/linux/safenetlink"
 	"github.com/cilium/cilium/pkg/datapath/linux/sysctl"
 	"github.com/cilium/cilium/pkg/datapath/tables"
 	datapath "github.com/cilium/cilium/pkg/datapath/types"
@@ -400,6 +401,8 @@ func (m *Manager) Start(ctx cell.HookContext) error {
 	}
 
 	if err := m.modulesMgr.FindOrLoadModules("xt_socket"); err != nil {
+		m.logger.WithError(err).Warning("xt_socket kernel module could not be loaded")
+
 		if !m.sharedCfg.TunnelingEnabled {
 			// xt_socket module is needed to circumvent an explicit drop in ip_forward()
 			// logic for packets for which a local socket is found by ip early
@@ -416,8 +419,6 @@ func (m *Manager) Start(ctx cell.HookContext) error {
 			// We would not need the xt_socket at all if the datapath universally would
 			// set the "to proxy" skb mark bits on before the packet hits policy routing
 			// stage. Currently this is not true for endpoint routing modes.
-			m.logger.WithError(err).Warning("xt_socket kernel module could not be loaded")
-
 			if m.sharedCfg.EnableXTSocketFallback {
 				m.disableIPEarlyDemux()
 			}
@@ -1207,7 +1208,7 @@ func (m *Manager) installMasqueradeRules(
 			family = netlink.FAMILY_V6
 		}
 		initialPass := true
-		if routes, err := netlink.RouteList(nil, family); err == nil {
+		if routes, err := safenetlink.RouteList(nil, family); err == nil {
 		nextPass:
 			for _, r := range routes {
 				var link netlink.Link

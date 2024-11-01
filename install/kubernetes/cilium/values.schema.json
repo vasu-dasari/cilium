@@ -152,6 +152,9 @@
                         "podSecurityContext": {
                           "type": "object"
                         },
+                        "priorityClassName": {
+                          "type": "string"
+                        },
                         "resources": {
                           "type": "object"
                         },
@@ -358,6 +361,9 @@
                         },
                         "podSecurityContext": {
                           "type": "object"
+                        },
+                        "priorityClassName": {
+                          "type": "string"
                         },
                         "resources": {
                           "type": "object"
@@ -582,6 +588,9 @@
             "integer"
           ]
         },
+        "lbSourceRangeAllTypes": {
+          "type": "boolean"
+        },
         "mapDynamicSizeRatio": {
           "type": [
             "null",
@@ -675,6 +684,9 @@
           "items": {},
           "type": "array"
         },
+        "generateCA": {
+          "type": "boolean"
+        },
         "image": {
           "properties": {
             "digest": {
@@ -701,8 +713,14 @@
           },
           "type": "object"
         },
+        "nodeSelector": {
+          "type": "object"
+        },
         "podLabels": {
           "type": "object"
+        },
+        "priorityClassName": {
+          "type": "string"
         },
         "tolerations": {
           "items": {},
@@ -1502,6 +1520,12 @@
             "string"
           ]
         },
+        "enableSourceIPVerification": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
         "runPath": {
           "type": "string"
         }
@@ -2011,7 +2035,16 @@
               ]
             },
             "format": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "format_json": {
+              "type": [
+                "null",
+                "object"
+              ]
             },
             "path": {
               "type": "string"

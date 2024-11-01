@@ -278,10 +278,11 @@ decapsulated
 decapsulation
 decrypt
 decrypted
+deduplicate
 deepcopy
+defaultLBServiceIPAM
 deletetopic
 demux
-defaultLBServiceIPAM
 denylist
 dereference
 deserialization
@@ -297,6 +298,7 @@ dockerhub
 dpaa
 dropdown
 dryRun
+durations
 dwarfris
 eBGP
 eBPF
@@ -307,6 +309,7 @@ effectful
 egressing
 elfutils
 ena
+enableSourceIPVerification
 enablement
 endPort
 endian
@@ -320,6 +323,7 @@ eth
 ethernet
 ethtool
 existingSecret
+expirations
 extTrafficPolicy
 extern
 externalIPs
@@ -402,6 +406,7 @@ inlined
 inlines
 inlining
 inodes
+inspectability
 instantiation
 integrations
 internalTrafficPolicy
@@ -510,6 +515,8 @@ maglev
 mainboard
 makefile
 mana
+marshallable
+marshalled
 masq
 matchExpressions
 matchLabels
@@ -524,6 +531,7 @@ microservice
 microservices
 minikube
 misconfiguration
+misconfigured
 misconfigures
 mitigations
 mlx
@@ -559,6 +567,7 @@ netdevsim
 netfilter
 netfront
 netkit
+netlink
 netns
 netperf
 netsec
@@ -646,6 +655,9 @@ rebase
 rebased
 rebasing
 recompiles
+reconcilation
+reconciler
+reconcilers
 reconfigurations
 reconnections
 recv
@@ -657,7 +669,9 @@ reparsing
 repo
 repos
 reproducibility
+reqid
 requireIPv
+resizable
 resync
 retpoline
 retransmission
@@ -736,7 +750,9 @@ tcx
 templating
 terminatingTLS
 terminationGracePeriodSeconds
+testability
 testsuite
+testutils
 tetragon
 th
 thunderx
@@ -772,6 +788,7 @@ uninline
 unix
 unlabel
 unmanaged
+unmarshalled
 unmigrated
 unselect
 unsettable
