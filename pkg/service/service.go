@@ -1312,12 +1312,42 @@ func (s *Service) SyncWithK8sFinished(localOnly bool, localServices sets.Set[k8s
 		} else if svc.restoredBackendHashes.Len() > 0 {
 			// The service is still associated with stale backends
 			stale = append(stale, svcID)
-			log.WithFields(logrus.Fields{
+			scopedLog := log.WithFields(logrus.Fields{
+				logfields.ServiceName: svc.svcName.String(),
+				logfields.L3n4Addr:    logfields.Repr(svc.frontend.L3n4Addr),
+			})
+			scopedLog.WithFields(logrus.Fields{
 				logfields.ServiceID:      svc.frontend.ID,
-				logfields.ServiceName:    svc.svcName.String(),
-				logfields.L3n4Addr:       logfields.Repr(svc.frontend.L3n4Addr),
 				logfields.OrphanBackends: svc.restoredBackendHashes.Len(),
 			}).Info("Service has stale backends: triggering refresh")
+
+			// We directly prune the stale backends if we are in the final pass
+			// (!localOnly), OR if this is a remote service (cluster name matches).
+			if !localOnly || (svc.svcName.Cluster != "" && svc.svcName.Cluster != option.Config.ClusterName) {
+				validBackends := []*lb.Backend{}
+				staleBackends := []string{}
+				for _, b := range svc.backends {
+					if !svc.restoredBackendHashes.Has(b.L3n4Addr.Hash()) {
+						validBackends = append(validBackends, b.DeepCopy())
+					} else {
+						staleBackends = append(staleBackends, b.L3n4Addr.String())
+					}
+				}
+				scopedLog.WithFields(logrus.Fields{
+					"staleBackends": staleBackends,
+					"validBackends": validBackends,
+				}).Info("Pruning stale backends directly (remote service)")
+
+				svc.restoredBackendHashes = nil
+
+				svcCopy := svc.deepCopyToLBSVC()
+				svcCopy.Backends = validBackends
+
+				if _, _, err := s.upsertService(svcCopy); err != nil {
+					log.WithError(err).Warn("Failed to upsert service during stale backend pruning")
+				}
+				continue
+			}
 		}
 
 		svc.restoredBackendHashes = nil
