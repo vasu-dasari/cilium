@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"slices"
 	"strconv"
@@ -28,6 +29,8 @@ import (
 	"github.com/cilium/cilium/pkg/source"
 	"github.com/cilium/cilium/pkg/testutils"
 	"github.com/cilium/cilium/pkg/time"
+	pkgtypes "github.com/cilium/cilium/pkg/types"
+	"github.com/cilium/cilium/pkg/u8proto"
 )
 
 // Convenient aliases for the service types.
@@ -1461,4 +1464,143 @@ func showMaps(m []maps.MapDump) string {
 	}
 	w.WriteString("},\n")
 	return w.String()
+}
+
+func TestBPFOps_RestoreAndPruneStaleBackends(t *testing.T) {
+	lc := hivetest.Lifecycle(t)
+	log := hivetest.Logger(t)
+
+	cfg, _ := loadbalancer.NewConfig(log, loadbalancer.DefaultUserConfig, loadbalancer.DeprecatedConfig{}, &option.DaemonConfig{})
+	extCfg := loadbalancer.ExternalConfig{
+		ZoneMapper: &option.DaemonConfig{},
+		EnableIPv4: true,
+		EnableIPv6: true,
+	}
+
+	fakeMaps := maps.NewFakeLBMaps()
+
+	// Pre-populate the BPF maps with:
+	// - Service 17 (10.0.0.1:80/TCP, ClusterIP, ID 17)
+	// - Backend 1 (10.1.0.1:80/TCP, ID 1)
+	// - Backend 2 (1.2.3.4:80/TCP, ID 2) (stale)
+	// - Service 17 Slot 0: master (LBALG=random, COUNT=2, QCOUNT=0, FLAGS=0)
+	// - Service 17 Slot 1: BEID 1
+	// - Service 17 Slot 2: BEID 2
+
+	proto := u8proto.TCP
+	svcIP := net.ParseIP("10.0.0.1")
+	svcPort := uint16(80)
+	svcKey0 := maps.NewService4Key(svcIP, svcPort, proto, loadbalancer.ScopeExternal, 0)
+	svcKey1 := maps.NewService4Key(svcIP, svcPort, proto, loadbalancer.ScopeExternal, 1)
+	svcKey2 := maps.NewService4Key(svcIP, svcPort, proto, loadbalancer.ScopeExternal, 2)
+
+	// In the real agent, restored service ID is the RevNat value from slot 0.
+	feID := loadbalancer.ServiceID(17)
+	flag := loadbalancer.NewSvcFlag(&loadbalancer.SvcFlagParam{
+		SvcType:      loadbalancer.SVCTypeClusterIP,
+		SvcNatPolicy: loadbalancer.SVCNatPolicyNone,
+		IsRoutable:   true,
+	})
+	svcVal0 := &maps.Service4Value{}
+	svcVal0.SetFlags(flag.UInt16())
+	svcVal0.SetRevNat(int(feID))
+	svcVal0.SetCount(2) // We had 2 backends
+
+	beID1 := loadbalancer.BackendID(1)
+	svcVal1 := &maps.Service4Value{}
+	svcVal1.SetBackendID(beID1)
+	svcVal1.SetRevNat(int(feID))
+
+	beID2 := loadbalancer.BackendID(2)
+	svcVal2 := &maps.Service4Value{}
+	svcVal2.SetBackendID(beID2)
+	svcVal2.SetRevNat(int(feID))
+
+	require.NoError(t, fakeMaps.UpdateService(svcKey0.ToNetwork(), svcVal0.ToNetwork()))
+	require.NoError(t, fakeMaps.UpdateService(svcKey1.ToNetwork(), svcVal1.ToNetwork()))
+	require.NoError(t, fakeMaps.UpdateService(svcKey2.ToNetwork(), svcVal2.ToNetwork()))
+
+	// Pre-populate Backend maps
+	beIP1 := types.MustParseAddrCluster("10.1.0.1")
+	beIP2 := types.MustParseAddrCluster("1.2.3.4")
+	beVal1, err := maps.NewBackend4V3(beID1, beIP1, 80, proto, loadbalancer.BackendStateActive, 0)
+	require.NoError(t, err)
+	beVal2, err := maps.NewBackend4V3(beID2, beIP2, 80, proto, loadbalancer.BackendStateActive, 0)
+	require.NoError(t, err)
+
+	require.NoError(t, fakeMaps.UpdateBackend(beVal1.Key, beVal1.Value.ToNetwork()))
+	require.NoError(t, fakeMaps.UpdateBackend(beVal2.Key, beVal2.Value.ToNetwork()))
+
+	// Pre-populate RevNat maps
+	require.NoError(t, fakeMaps.UpdateRevNat(maps.NewRevNat4Key(feID).ToNetwork(), (&maps.RevNat4Value{
+		Address: pkgtypes.IPv4(netip.MustParseAddr("10.0.0.1").As4()),
+		Port:    svcPort,
+	}).ToNetwork()))
+
+	db := statedb.New()
+	nodeAddrs, err := tables.NewNodeAddressTable(db)
+	require.NoError(t, err)
+
+	p := bpfOpsParams{
+		Lifecycle:      lc,
+		Log:            log,
+		Config:         cfg,
+		ExternalConfig: extCfg,
+		LBMaps:         fakeMaps,
+		Maglev:         nil,
+		DB:             db,
+		NodeAddresses:  nodeAddrs,
+	}
+
+	ops := newBPFOps(p)
+
+	// Verify that restored IDs are loaded
+	require.Contains(t, ops.restoredServiceIDs, loadbalancer.NewL3n4Addr(loadbalancer.TCP, types.MustParseAddrCluster("10.0.0.1"), 80, loadbalancer.ScopeExternal))
+	require.Contains(t, ops.restoredBackendIDs, loadbalancer.NewL3n4Addr(loadbalancer.TCP, types.MustParseAddrCluster("10.1.0.1"), 80, loadbalancer.ScopeExternal))
+	require.Contains(t, ops.restoredBackendIDs, loadbalancer.NewL3n4Addr(loadbalancer.TCP, types.MustParseAddrCluster("1.2.3.4"), 80, loadbalancer.ScopeExternal))
+
+	// Now update the service with only Backend 1 (desired state).
+	// We construct a Frontend object.
+	fe := baseFrontend
+	fe.Type = loadbalancer.SVCTypeClusterIP
+	fe.Address = loadbalancer.NewL3n4Addr(loadbalancer.TCP, types.MustParseAddrCluster("10.0.0.1"), 80, loadbalancer.ScopeExternal)
+	fe.Backends = func(yield func(*loadbalancer.Backend, statedb.Revision) bool) {
+		be := loadbalancer.Backend{
+			Address:   loadbalancer.NewL3n4Addr(loadbalancer.TCP, types.MustParseAddrCluster("10.1.0.1"), 80, loadbalancer.ScopeExternal),
+			Weight:    100,
+			State:     loadbalancer.BackendStateActive,
+			ClusterID: 0,
+		}
+		yield(&be, 1)
+	}
+	fe.Service = &baseService
+
+	// Reconcile the update
+	err = ops.Update(context.TODO(), db.ReadTxn(), 1, &fe)
+	require.NoError(t, err)
+
+	// Now run Prune
+	err = ops.Prune(context.TODO(), db.ReadTxn(), nil)
+	require.NoError(t, err)
+
+	// Dump BPF maps and verify
+	dumped := dumpLBMapsWithReplace(fakeMaps, fe.Address, false)
+
+	// We expect:
+	// - Backend 1 exists
+	// - Backend 2 (stale) does NOT exist
+	// - Service Slot 0 exists (count should be 1)
+	// - Service Slot 1 exists (points to Backend 1)
+	// - Service Slot 2 does NOT exist (stale backend pruned)
+
+	expected := []string{
+		"BE: ID=1 ADDR=10.1.0.1:80/TCP STATE=active",
+		"REV: ID=17 ADDR=<auto>",
+		"SVC: ID=17 ADDR=<auto>/TCP SLOT=0 LBALG=undef AFFTimeout=0 COUNT=1 QCOUNT=0 FLAGS=ClusterIP+Local+InternalLocal+non-routable",
+		"SVC: ID=17 ADDR=<auto>/TCP SLOT=1 BEID=1 COUNT=0 QCOUNT=0 FLAGS=ClusterIP+Local+InternalLocal+non-routable",
+	}
+
+	slices.Sort(dumped)
+	slices.Sort(expected)
+	require.Equal(t, expected, dumped)
 }
