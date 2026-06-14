@@ -6,6 +6,7 @@ package eni
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"testing"
 	"time"
 
@@ -13,12 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	metricsmock "github.com/cilium/cilium/operator/pkg/ipam/metrics/mock"
+	"github.com/cilium/cilium/operator/pkg/ipam/nodemanager"
 	ec2mock "github.com/cilium/cilium/pkg/aws/ec2/mock"
 	eniTypes "github.com/cilium/cilium/pkg/aws/eni/types"
 	metadataMock "github.com/cilium/cilium/pkg/aws/metadata/mock"
 	"github.com/cilium/cilium/pkg/aws/types"
-	"github.com/cilium/cilium/pkg/ipam"
-	metricsmock "github.com/cilium/cilium/pkg/ipam/metrics/mock"
+	iputil "github.com/cilium/cilium/pkg/ip"
 	ipamTypes "github.com/cilium/cilium/pkg/ipam/types"
 	v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	"github.com/cilium/cilium/pkg/testutils"
@@ -35,7 +37,7 @@ var (
 	}
 	testVpc = &ipamTypes.VirtualNetwork{
 		ID:          "vpc-1",
-		PrimaryCIDR: "10.10.0.0/16",
+		PrimaryCIDR: iputil.PrefixFrom(netip.MustParsePrefix("10.10.0.0/16")),
 	}
 	testSecurityGroups = []*types.SecurityGroup{
 		{
@@ -87,7 +89,7 @@ func TestGetNodeNames(t *testing.T) {
 	instances, err := NewInstancesManager(t.Context(), hivetest.Logger(t), ec2api, metadataMockapi)
 	require.NoError(t, err)
 	require.NotNil(t, instances)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -117,7 +119,7 @@ func TestNodeManagerGet(t *testing.T) {
 	instances, err := NewInstancesManager(t.Context(), hivetest.Logger(t), ec2api, metadataMockapi)
 	require.NoError(t, err)
 	require.NotNil(t, instances)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -155,7 +157,7 @@ func TestNodeManagerDefaultAllocation(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -202,7 +204,7 @@ func TestNodeManagerPrefixDelegation(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, true)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, true)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -274,7 +276,7 @@ func TestNodeManagerENIWithSGTags(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -337,7 +339,7 @@ func TestNodeManagerMinAllocate20(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -396,7 +398,7 @@ func TestNodeManagerMinAllocateAndPreallocate(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -464,7 +466,7 @@ func TestNodeManagerReleaseAddress(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, true, 2, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, true, 2, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -577,7 +579,7 @@ func TestNodeManagerENIExcludeInterfaceTags(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -645,7 +647,7 @@ func TestNodeManagerExceedENICapacity(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -707,7 +709,7 @@ func TestInterfaceCreatedInInitialSubnet(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -767,7 +769,7 @@ func TestNodeManagerManyNodes(t *testing.T) {
 	instancesManager, err := NewInstancesManager(t.Context(), hivetest.Logger(t), ec2api, metadataMockapi)
 	require.NoError(t, err)
 	require.NotNil(t, instancesManager)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instancesManager, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instancesManager, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -838,7 +840,7 @@ func TestNodeManagerInstanceNotRunning(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	ec2api.SetMockError(ec2mock.AttachNetworkInterface, errors.New("foo is not 'running' foo"))
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
@@ -890,7 +892,7 @@ func TestInstanceBeenDeleted(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -949,7 +951,7 @@ func TestNodeManagerStaticIP(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -998,7 +1000,7 @@ func TestNodeManagerStaticIPAlreadyAssociated(t *testing.T) {
 	require.NoError(t, err)
 	_, err = instances.Resync(t.Context())
 	require.NoError(t, err)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -1025,7 +1027,7 @@ func benchmarkAllocWorker(b *testing.B, workers int64, delay time.Duration, rate
 	instances, err := NewInstancesManager(b.Context(), hivetest.Logger(b), ec2api, metadataMockapi)
 	require.NoError(b, err)
 	require.NotNil(b, instances)
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(b), instances, k8sapi, metricsapi, 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(b), instances, k8sapi, metricsapi, 10, false, 0, false)
 	require.NoError(b, err)
 	require.NotNil(b, mngr)
 
@@ -1206,7 +1208,7 @@ func updateCiliumNode(cn *v2.CiliumNode, available, used int) *v2.CiliumNode {
 	return cn
 }
 
-func reachedAddressesNeeded(mngr *ipam.NodeManager, nodeName string, needed int) (success bool) {
+func reachedAddressesNeeded(mngr *nodemanager.NodeManager, nodeName string, needed int) (success bool) {
 	if node := mngr.Get(nodeName); node != nil {
 		success = node.GetNeededAddresses() == needed
 	}

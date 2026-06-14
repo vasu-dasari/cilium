@@ -8,9 +8,9 @@ import (
 	"github.com/cilium/statedb"
 	"github.com/cilium/statedb/reconciler"
 
-	"github.com/cilium/cilium/daemon/k8s"
 	"github.com/cilium/cilium/operator/pkg/ztunnel/config"
 	ztunnelReconciler "github.com/cilium/cilium/operator/pkg/ztunnel/reconciler"
+	k8sTables "github.com/cilium/cilium/pkg/k8s/tables"
 	"github.com/cilium/cilium/pkg/metrics"
 	"github.com/cilium/cilium/pkg/ztunnel/table"
 )
@@ -23,7 +23,7 @@ var Cell = cell.Module(
 	cell.Config(config.DefaultConfig),
 	metrics.Metric(ztunnelReconciler.NewMetrics),
 	cell.Provide(
-		k8s.NewNamespaceTableAndReflector,
+		k8sTables.NewNamespaceTableAndReflector,
 		table.NewEnrolledNamespacesTable,
 		ztunnelReconciler.NewServiceAccountTable,
 		ztunnelReconciler.NewEnrollmentReconciler,
@@ -45,7 +45,10 @@ func registerEnrollmentReconciler(
 	ops reconciler.Operations[*table.EnrolledNamespace],
 	tbl statedb.RWTable[*table.EnrolledNamespace],
 ) error {
-	if !cfg.EnableZTunnel {
+	// The reconciler manages SPIRE entries for enrolled namespaces, so it only
+	// runs when ztunnel is configured to use an external SPIRE CA. With the
+	// internal CA there is no SPIRE server to enroll against.
+	if !cfg.UseSpireCA() {
 		return nil
 	}
 	_, err := reconciler.Register(

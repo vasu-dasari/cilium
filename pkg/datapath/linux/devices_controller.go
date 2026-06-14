@@ -434,7 +434,7 @@ func populateFromLink(d *tables.Device, link netlink.Link) {
 func (dc *devicesController) processBatch(txn statedb.WriteTxn, batch map[int][]any) {
 	before := dc.deviceNameSet(txn)
 	for index, updates := range batch {
-		d, _, _ := dc.params.DeviceTable.Get(txn, tables.DeviceIDIndex.Query(index))
+		d, _, _ := dc.params.DeviceTable.Get(txn, tables.DeviceByIndex(index))
 		if d == nil {
 			// Unseen device. We may receive address updates before link updates
 			// and thus the only thing we know at this point is the index.
@@ -453,6 +453,14 @@ func (dc *devicesController) processBatch(txn statedb.WriteTxn, batch map[int][]
 			switch u := u.(type) {
 			case netlink.AddrUpdate:
 				if dc.deadLinkIndexes.Has(u.LinkIndex) {
+					continue
+				}
+				// Skip addresses that are not usable yet. Tentative addresses
+				// are still going through DAD and dadfailed ones never will,
+				// so populating Device.Addrs with them would surface unusable
+				// addresses to downstream features. A later AddrUpdate emitted
+				// by the kernel when DAD completes will add the address.
+				if u.NewAddr && u.Flags&(unix.IFA_F_TENTATIVE|unix.IFA_F_DADFAILED) != 0 {
 					continue
 				}
 				addr := deviceAddressFromAddrUpdate(u)
@@ -658,7 +666,7 @@ func (dc *devicesController) isSelectedDevice(d *tables.Device, txn statedb.Writ
 
 	// Ignore bridge and bonding children devices, but allow VRF device children.
 	if d.MasterIndex != 0 {
-		masterDevice, _, ok := dc.params.DeviceTable.Get(txn, tables.DeviceIDIndex.Query(d.MasterIndex))
+		masterDevice, _, ok := dc.params.DeviceTable.Get(txn, tables.DeviceByIndex(d.MasterIndex))
 		if !ok {
 			return false, fmt.Sprintf("device has parent but parent device could not be found: %d", d.MasterIndex)
 		}

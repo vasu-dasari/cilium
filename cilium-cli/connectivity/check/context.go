@@ -699,7 +699,7 @@ func (ct *ConnectivityTest) detectPodCIDRs() {
 		// additional IP pools from multi-pool IPAM mode
 		for _, pool := range n.Spec.IPAM.Pools.Allocated {
 			for _, podCIDR := range pool.CIDRs {
-				ct.params.PodCIDRs = append(ct.params.PodCIDRs, toPodCIDRs(string(podCIDR), hostIPs...)...)
+				ct.params.PodCIDRs = append(ct.params.PodCIDRs, toPodCIDRs(podCIDR.String(), hostIPs...)...)
 			}
 		}
 	}
@@ -811,16 +811,6 @@ func (ct *ConnectivityTest) detectNodesWithoutCiliumIPs() error {
 	return nil
 }
 
-func (ct *ConnectivityTest) requiresStaticRoutes() bool {
-	if f, ok := ct.Feature(features.Flavor); ok && f.Enabled {
-		switch f.Mode {
-		case "gke", "aks", "eks":
-			return false
-		}
-	}
-	return true
-}
-
 type ipRouteVerb string
 
 const (
@@ -829,11 +819,6 @@ const (
 )
 
 func (ct *ConnectivityTest) modifyStaticRoutesForNodesWithoutCilium(ctx context.Context, verb ipRouteVerb) error {
-	if !ct.requiresStaticRoutes() {
-		ct.Debugf("Skipping modifying static route on nodes without Cilium, cloud platform has pod connectivity")
-		return nil
-	}
-
 	for _, e := range ct.params.PodCIDRs {
 		for withoutCilium := range ct.nodesWithoutCilium {
 			pod := ct.hostNetNSPodsByNode[withoutCilium]
@@ -861,6 +846,17 @@ func (ct *ConnectivityTest) modifyStaticRoutesForNodesWithoutCilium(ctx context.
 // NeedsStaticRoutes checks whether any test requires static ip routes
 // installed.
 func (ct *ConnectivityTest) NeedsStaticRoutes() bool {
+	// Static routes are only needed when running unsafe tests.
+	if !ct.params.IncludeUnsafeTests {
+		return false
+	}
+
+	// Static routes are only needed on kind. Cloud platforms have pod IP -> node IP
+	// connectivity.
+	if f, ok := ct.Feature(features.Flavor); ok && f.Enabled && f.Mode != "kind" {
+		return false
+	}
+
 	return slices.ContainsFunc(ct.tests, func(t *Test) bool {
 		return t.installIPRoutesFromOutsideToPodCIDRs
 	})
@@ -1400,6 +1396,13 @@ func (ct *ConnectivityTest) ForEachIPFamily(do func(features.IPFamily)) {
 			}
 		}
 	}
+}
+
+func (ct *ConnectivityTest) ShouldRunConnDisrupt() bool {
+	return ct.params.IncludeConnDisruptTest ||
+		ct.ShouldRunConnDisruptNSTraffic() ||
+		ct.ShouldRunConnDisruptL7Traffic() ||
+		ct.ShouldRunConnDisruptEgressGateway()
 }
 
 func (ct *ConnectivityTest) ShouldRunConnDisruptNSTraffic() bool {

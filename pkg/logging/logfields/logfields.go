@@ -295,6 +295,9 @@ const (
 	// MTU is the maximum transmission unit of one interface
 	MTU = "mtu"
 
+	// MinMTU is the minimum MTU allowed for an interface
+	MinMTU = "minMTU"
+
 	// Interface is an interface id/name on the system
 	Interface = "interface"
 
@@ -1151,11 +1154,19 @@ const (
 
 	PoolName = "poolName"
 
+	AllowFirstIP = "allowFirstIP"
+
+	AllowLastIP = "allowLastIP"
+
 	MaxRetries = "maxRetries"
 
 	Retries = "retries"
 
 	Gateway = "gateway"
+
+	GammaService = "gammaService"
+
+	GatewayClass = "GatewayClass"
 
 	Kind = "kind"
 
@@ -1206,6 +1217,10 @@ const (
 	TLSRoute = "tlsRoute"
 
 	GRPCRoute = "grpcRoute"
+
+	TCPRoute = "tcpRoute"
+
+	UDPRoute = "udpRoute"
 
 	Secret = "secret"
 
@@ -1887,4 +1902,10 @@ const (
 	AttachType = "attachType"
 
 	WithFrags = "withFrags"
+
+	CiliumDatapathPluginName = "datapathPluginName"
+
+	CiliumDatapathPluginAttachmentPolicy = "datapathPluginAttachmentPolicy"
+
+	CiliumDatapathPluginVersion = "datapathPluginVersion"
 )

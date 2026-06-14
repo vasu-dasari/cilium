@@ -300,6 +300,41 @@ Informational Notes
   warning log. Existing empty policies already present in the cluster are not
   affected, but any create or update that results in an empty policy will be
   rejected.
+* The Azure IPAM status on ``CiliumNode`` now tracks the subnet at the
+  interface level, matching the AWS and AlibabaCloud IPAM representations.
+  All IP configurations on an Azure NIC must share a subnet, so the new
+  ``status.azure.interfaces[].subnet`` object (``id`` and ``cidr``) is the
+  authoritative source of subnet information. The previously redundant
+  ``status.azure.interfaces[].addresses[].subnet`` and flat
+  ``status.azure.interfaces[].cidr`` fields are deprecated and continue to
+  be populated as mirrors for one release so that operator and agent
+  rolling upgrades work in either order and so that external consumers
+  parsing the CRD have a window to switch their reads to
+  ``status.azure.interfaces[].subnet``. A future release will remove both
+  deprecated fields.
+* Cilium MCS-API implementation now uses the ``v1beta1`` version of the
+  MCS-API CRDs. Note that ``v1alpha1`` remains fully supported, and this
+  upgrade should be fully transparent. You are still encouraged to update
+  your ``ServiceExport`` resources to ``v1beta1`` to benefit from future
+  improvements and prepare for the eventual deprecation of ``v1alpha1``.
+* Listing BGP peers, routes and route-policies via the local REST API and ``cilium-dbg bgp`` commands is deprecated.
+  Use the BGP hive shell commands instead: ``cilium shell -- bgp/*``.
+* The default duration of automatically generated Cluster Mesh certificates is
+  reduced to one year, and matches the default duration of Hubble certificates.
+  Note that certificates generated through the ``helm`` method (default) are
+  only renewed when the Helm chart is re-rendered (typically during a Cilium
+  upgrade). Make sure to upgrade Cilium at least once per year to prevent the
+  certificates from expiring, or explicitly configure a longer validity through
+  the ``clustermesh.apiserver.tls.auto.certValidityDuration`` option. The same
+  limitation does not apply to the other generation methods (``cronJob`` and
+  ``certmanager``), which support automatic certificate renewal.
+* The certgen tool, which is used to automatically generate Hubble and Cluster
+  Mesh certificates in ``cronJob`` mode, now defaults to enforcing that the CA
+  chain remains valid for the entire duration of the leaf certificates to be
+  generated, and fails with a hard error if that is not the case. This allows
+  to flag early situations in which the CA certificates need to be manually
+  regenerated, before they actually expire. This validation can be disabled
+  setting ``certgen.enforceCAValidityThroughoutLeavesDuration=false``.
 
 Changes to Features
 ~~~~~~~~~~~~~~~~~~~
@@ -338,6 +373,12 @@ differently than in prior releases:
 * ``bpf.tproxy=true`` is incompatible with netkit datapath mode. If netkit is also enabled,
   Cilium will fail to start. If auto-detect datapath mode is used, Cilium will revert to
   veth mode, even if netkit support is present.
+* The ``clustermesh.apiserver.tls.server.{extraDnsNames,extraIpAddresses}`` options are
+  replaced by ``clustermesh.apiserver.tls.auto.server.{extraDnsNames,extraIpAddresses}``.
+  The previous values, if set, are still used as a fallback for backwards compatibility.
+  The ``clustermesh-apiserver.cilium.io`` DNS name is also no longer included by default.
+* Cluster Mesh certificates are now configured to be automatically regenerated every
+  4 months, when the ``cronJob`` generation mode is selected.
 
 Deprecated Options
 ##################
@@ -346,7 +387,13 @@ The following options have been deprecated in this version of Cilium. A future
 version of Cilium will remove these options, so if you use these options then
 you may need to take action to migrate to an alternative.
 
-* TODO
+* The ``hubble.preferIpv6`` Helm value and ``--hubble-prefer-ipv6`` agent flag
+  have been deprecated and will be removed in Cilium 1.20. Use the top-level
+  ``preferIpv6`` Helm value and ``--prefer-ipv6`` agent flag instead, which
+  apply to both health probes and Hubble peer communication.
+
+* The ``--tofqdns-pre-cache`` agent flag and the corresponding Helm value
+  ``dnsProxy.preCache`` have been deprecated and will be removed in v1.21.
 
 Removed Options
 ###############
@@ -372,6 +419,43 @@ from Cilium.
   ``hubble-redact-kafka-apikey`` agent flag have been removed as part of
   dropping Kafka support.
 
+* The previously deprecated and ignored ``--ces-slice-mode`` operator flag has been removed.
+
+* The previously deprecated ``--node-port-algorithm`` agent flag has been removed
+  in favor of ``--bpf-lb-algorithm`` (``loadBalancer.algorithm`` Helm value).
+
+* The previously deprecated ``--node-port-mode`` agent flag has been removed
+  in favor of the ``--bpf-lb-mode`` (``loadBalancer.mode`` Helm value).
+
+* The previously deprecated and ignored ``--enable-ipsec-encrypted-overlay`` agent
+  flag (Helm ``encryption.ipsec.encryptedOverlay``) has been removed.
+
+* The previously deprecated ``--enable-encryption-strict-mode`` agent flag
+  (Helm ``encryption.strictMode.enabled``) has been removed in favor of
+  ``--enable-encryption-strict-mode-egress`` (Helm ``encryption.strictMode.egress.enabled``).
+
+* The previously deprecated ``--encryption-strict-mode-cidr`` agent flag
+  (Helm ``encryption.strictMode.cidrs``) has been removed in favor of
+  ``--encryption-strict-egress-cidr"`` (Helm ``encryption.strictMode.egress.cidrs``).
+
+* The previously deprecated ``--encryption-strict-mode-allow-remote-node-identities``
+  agent flag (Helm ``encryption.strictMode.allowRemoteNodeIdentities``) has been
+  removed in favor of ``--encryption-strict-egress-allow-remote-node-identities``
+  (Helm ``encryption.strictMode.egress.allowRemoteNodeIdentities``).
+
+* The previously deprecated ``--k8s-api-server`` agent flag has been removed in
+  favor of ``--k8s-api-server-urls`` (Helm ``k8s.apiServerURLs`` value).
+
+* The ``cilium-dbg preflight fqdn-poller`` subcommand and the
+  ``preflight.tofqdnsPreCache`` Helm value have been removed. These were
+  originally introduced for the v1.3 to v1.4 upgrade path and are no longer
+  needed.
+
+* The previously deprecated support for providing Cluster Mesh TLS certificates
+  and keys as helm values has been removed. You are now expected to pre-create
+  these secrets outside of the Cilium Helm chart when setting
+  ``clustermesh.apiserver.tls.auto.enabled=false``.
+
 Changes to Metrics
 ~~~~~~~~~~~~~~~~~~
 
@@ -384,6 +468,10 @@ Added Metrics
   tagged by the status (``OK``, ``Warning``, ``Failure``) of each component (``BPF``, ``Policy``).
 * ``cilium_kubernetes_resource_sync_duration`` was added and reports duration in seconds
   of a specific Kubernetes resource sync.
+* ``cilium_hive_start_duration`` was added and reports the hive.Start method duration.
+* ``cilium_hive_stop_duration`` was added and reports the hive.Stop method duration.
+  Not reported when metrics are handled by a hive (common in cilium-agent and cilium-operator). Disabled by default.
+* ``cilium_hive_populate_duration`` was added and reports the hive.Populate method duration.
 
 Changed Metrics
 ###############

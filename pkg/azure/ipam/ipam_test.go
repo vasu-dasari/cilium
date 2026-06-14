@@ -14,10 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	metricsmock "github.com/cilium/cilium/operator/pkg/ipam/metrics/mock"
+	"github.com/cilium/cilium/operator/pkg/ipam/nodemanager"
 	apimock "github.com/cilium/cilium/pkg/azure/api/mock"
 	"github.com/cilium/cilium/pkg/azure/types"
-	"github.com/cilium/cilium/pkg/ipam"
-	metricsmock "github.com/cilium/cilium/pkg/ipam/metrics/mock"
+	iputil "github.com/cilium/cilium/pkg/ip"
 	ipamTypes "github.com/cilium/cilium/pkg/ipam/types"
 	v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	"github.com/cilium/cilium/pkg/lock"
@@ -36,10 +37,6 @@ var (
 		{ID: "s-1", CIDR: netip.MustParsePrefix("1.1.0.0/16"), VirtualNetworkID: "vpc-1"},
 		{ID: "s-2", CIDR: netip.MustParsePrefix("2.2.0.0/16"), VirtualNetworkID: "vpc-1"},
 		{ID: "s-3", CIDR: netip.MustParsePrefix("3.3.3.3/16"), VirtualNetworkID: "vpc-1"},
-	}
-
-	testVnet = &ipamTypes.VirtualNetwork{
-		ID: "vpc-1",
 	}
 )
 
@@ -133,7 +130,7 @@ func updateCiliumNode(logger *slog.Logger, cn *v2.CiliumNode, used int) *v2.Cili
 	return cn
 }
 
-func reachedAddressesNeeded(mngr *ipam.NodeManager, nodeName string, needed int) (success bool) {
+func reachedAddressesNeeded(mngr *nodemanager.NodeManager, nodeName string, needed int) (success bool) {
 	if node := mngr.Get(nodeName); node != nil {
 		success = node.GetNeededAddresses() == needed
 	}
@@ -146,8 +143,8 @@ func TestIpamPreAllocate8(t *testing.T) {
 	minAllocate := 0
 	toUse := 7
 
-	api := apimock.NewAPI([]*ipamTypes.Subnet{testSubnet}, []*ipamTypes.VirtualNetwork{testVnet})
-	instances := NewInstancesManager(hivetest.Logger(t), api)
+	api := apimock.NewAPI([]*ipamTypes.Subnet{testSubnet})
+	instances := NewInstancesManager(hivetest.Logger(t), api, false)
 	require.NotNil(t, instances)
 
 	m := ipamTypes.NewInstanceMap()
@@ -155,11 +152,11 @@ func TestIpamPreAllocate8(t *testing.T) {
 	resource := &types.AzureInterface{
 		Name:          "eth0",
 		SecurityGroup: "sg1",
+		Subnet:        types.AzureSubnet{ID: "subnet-1"},
 		Addresses: []types.AzureAddress{
 			{
-				IP:     "1.1.1.1",
-				Subnet: "subnet-1",
-				State:  types.StateSucceeded,
+				IP:    iputil.AddrFrom(netip.MustParseAddr("1.1.1.1")),
+				State: types.StateSucceeded,
 			},
 		},
 		State: types.StateSucceeded,
@@ -173,7 +170,7 @@ func TestIpamPreAllocate8(t *testing.T) {
 	require.NoError(t, err)
 
 	k8sapi := newK8sMock()
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsmock.NewMockMetrics(), 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsmock.NewMockMetrics(), 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -208,8 +205,8 @@ func TestIpamMinAllocate10(t *testing.T) {
 	minAllocate := 10
 	toUse := 7
 
-	api := apimock.NewAPI([]*ipamTypes.Subnet{testSubnet}, []*ipamTypes.VirtualNetwork{testVnet})
-	instances := NewInstancesManager(hivetest.Logger(t), api)
+	api := apimock.NewAPI([]*ipamTypes.Subnet{testSubnet})
+	instances := NewInstancesManager(hivetest.Logger(t), api, false)
 	require.NotNil(t, instances)
 
 	m := ipamTypes.NewInstanceMap()
@@ -217,11 +214,11 @@ func TestIpamMinAllocate10(t *testing.T) {
 	resource := &types.AzureInterface{
 		Name:          "eth0",
 		SecurityGroup: "sg1",
+		Subnet:        types.AzureSubnet{ID: "subnet-1"},
 		Addresses: []types.AzureAddress{
 			{
-				IP:     "1.1.1.1",
-				Subnet: "subnet-1",
-				State:  types.StateSucceeded,
+				IP:    iputil.AddrFrom(netip.MustParseAddr("1.1.1.1")),
+				State: types.StateSucceeded,
 			},
 		},
 		State: types.StateSucceeded,
@@ -235,7 +232,7 @@ func TestIpamMinAllocate10(t *testing.T) {
 	require.NoError(t, err)
 
 	k8sapi := newK8sMock()
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsmock.NewMockMetrics(), 10, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metricsmock.NewMockMetrics(), 10, false, 0, false)
 	require.NoError(t, err)
 	require.NotNil(t, mngr)
 
@@ -292,13 +289,13 @@ func TestIpamManyNodes(t *testing.T) {
 				numNodes    = 2
 				minAllocate = 1
 			)
-			api := apimock.NewAPI(testSubnets, []*ipamTypes.VirtualNetwork{testVnet})
-			instances := NewInstancesManager(hivetest.Logger(t), api)
+			api := apimock.NewAPI(testSubnets)
+			instances := NewInstancesManager(hivetest.Logger(t), api, false)
 			require.NotNil(t, instances)
 
 			k8sapi := newK8sMock()
 			metrics := metricsmock.NewMockMetrics()
-			mngr, err := ipam.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metrics, int64(test.concurrency), false, 0, false)
+			mngr, err := nodemanager.NewNodeManager(hivetest.Logger(t), instances, k8sapi, metrics, int64(test.concurrency), false, 0, false)
 			require.NoError(t, err)
 			require.NotNil(t, mngr)
 
@@ -309,11 +306,11 @@ func TestIpamManyNodes(t *testing.T) {
 				resource := &types.AzureInterface{
 					Name:          "eth0",
 					SecurityGroup: "sg1",
+					Subnet:        types.AzureSubnet{ID: "subnet-1"},
 					Addresses: []types.AzureAddress{
 						{
-							IP:     fmt.Sprintf("10.0.0.%d", i+10),
-							Subnet: "subnet-1",
-							State:  types.StateSucceeded,
+							IP:    iputil.AddrFrom(netip.MustParseAddr(fmt.Sprintf("10.0.0.%d", i+10))),
+							State: types.StateSucceeded,
 						},
 					},
 					State: types.StateSucceeded,
@@ -364,16 +361,16 @@ func TestIpamManyNodes(t *testing.T) {
 }
 
 func benchmarkAllocWorker(b *testing.B, workers int64, delay time.Duration, rateLimit float64, burst int) {
-	api := apimock.NewAPI(testSubnets, []*ipamTypes.VirtualNetwork{testVnet})
+	api := apimock.NewAPI(testSubnets)
 	api.SetDelay(apimock.AllOperations, delay)
 	api.SetLimiter(rateLimit, burst)
 
-	instances := NewInstancesManager(hivetest.Logger(b), api)
+	instances := NewInstancesManager(hivetest.Logger(b), api, false)
 	require.NotNil(b, instances)
 
 	k8sapi := newK8sMock()
 	metrics := metricsmock.NewMockMetrics()
-	mngr, err := ipam.NewNodeManager(hivetest.Logger(b), instances, k8sapi, metrics, workers, false, 0, false)
+	mngr, err := nodemanager.NewNodeManager(hivetest.Logger(b), instances, k8sapi, metrics, workers, false, 0, false)
 	require.NoError(b, err)
 	require.NotNil(b, mngr)
 

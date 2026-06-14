@@ -277,8 +277,9 @@ type AllocationType string
 
 // Enum values for AllocationType
 const (
-	AllocationTypeUsed   AllocationType = "used"
-	AllocationTypeFuture AllocationType = "future"
+	AllocationTypeUsed       AllocationType = "used"
+	AllocationTypeFuture     AllocationType = "future"
+	AllocationTypeCancelling AllocationType = "cancelling"
 )
 
 // Values returns all known values for AllocationType. Note that this can be
@@ -289,6 +290,7 @@ func (AllocationType) Values() []AllocationType {
 	return []AllocationType{
 		"used",
 		"future",
+		"cancelling",
 	}
 }
 
@@ -405,6 +407,23 @@ func (ApplianceModeSupportValue) Values() []ApplianceModeSupportValue {
 	return []ApplianceModeSupportValue{
 		"enable",
 		"disable",
+	}
+}
+
+type ApplyCancellationCharges string
+
+// Enum values for ApplyCancellationCharges
+const (
+	ApplyCancellationChargesCommitmentWindDown ApplyCancellationCharges = "commitment-wind-down"
+)
+
+// Values returns all known values for ApplyCancellationCharges. Note that this
+// can be expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (ApplyCancellationCharges) Values() []ApplyCancellationCharges {
+	return []ApplyCancellationCharges{
+		"commitment-wind-down",
 	}
 }
 
@@ -1232,6 +1251,28 @@ func (CapacityReservationBillingRequestStatus) Values() []CapacityReservationBil
 	}
 }
 
+type CapacityReservationCancellationQuoteState string
+
+// Enum values for CapacityReservationCancellationQuoteState
+const (
+	CapacityReservationCancellationQuoteStatePending CapacityReservationCancellationQuoteState = "pending"
+	CapacityReservationCancellationQuoteStateActive  CapacityReservationCancellationQuoteState = "active"
+	CapacityReservationCancellationQuoteStateExpired CapacityReservationCancellationQuoteState = "expired"
+)
+
+// Values returns all known values for CapacityReservationCancellationQuoteState.
+// Note that this can be expanded in the future, and so it is only as up to date as
+// the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (CapacityReservationCancellationQuoteState) Values() []CapacityReservationCancellationQuoteState {
+	return []CapacityReservationCancellationQuoteState{
+		"pending",
+		"active",
+		"expired",
+	}
+}
+
 type CapacityReservationDeliveryPreference string
 
 // Enum values for CapacityReservationDeliveryPreference
@@ -1375,6 +1416,7 @@ const (
 	CapacityReservationStateAssessing      CapacityReservationState = "assessing"
 	CapacityReservationStateDelayed        CapacityReservationState = "delayed"
 	CapacityReservationStateUnsupported    CapacityReservationState = "unsupported"
+	CapacityReservationStateCancelling     CapacityReservationState = "cancelling"
 	CapacityReservationStateUnavailable    CapacityReservationState = "unavailable"
 )
 
@@ -1395,6 +1437,7 @@ func (CapacityReservationState) Values() []CapacityReservationState {
 		"assessing",
 		"delayed",
 		"unsupported",
+		"cancelling",
 		"unavailable",
 	}
 }
@@ -1596,6 +1639,7 @@ const (
 	ClientVpnEndpointStatusCodeAvailable        ClientVpnEndpointStatusCode = "available"
 	ClientVpnEndpointStatusCodeDeleting         ClientVpnEndpointStatusCode = "deleting"
 	ClientVpnEndpointStatusCodeDeleted          ClientVpnEndpointStatusCode = "deleted"
+	ClientVpnEndpointStatusCodePending          ClientVpnEndpointStatusCode = "pending"
 )
 
 // Values returns all known values for ClientVpnEndpointStatusCode. Note that this
@@ -1608,6 +1652,7 @@ func (ClientVpnEndpointStatusCode) Values() []ClientVpnEndpointStatusCode {
 		"available",
 		"deleting",
 		"deleted",
+		"pending",
 	}
 }
 
@@ -8142,6 +8187,26 @@ func (ManagedBy) Values() []ManagedBy {
 	}
 }
 
+type ManagedResourceDefaultVisibility string
+
+// Enum values for ManagedResourceDefaultVisibility
+const (
+	ManagedResourceDefaultVisibilityHidden  ManagedResourceDefaultVisibility = "hidden"
+	ManagedResourceDefaultVisibilityVisible ManagedResourceDefaultVisibility = "visible"
+)
+
+// Values returns all known values for ManagedResourceDefaultVisibility. Note that
+// this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (ManagedResourceDefaultVisibility) Values() []ManagedResourceDefaultVisibility {
+	return []ManagedResourceDefaultVisibility{
+		"hidden",
+		"visible",
+	}
+}
+
 type MarketType string
 
 // Enum values for MarketType
@@ -9595,6 +9660,8 @@ const (
 	ResourceTypeSecondarySubnet                                        ResourceType = "secondary-subnet"
 	ResourceTypeCapacityManagerDataExport                              ResourceType = "capacity-manager-data-export"
 	ResourceTypeVpnConcentrator                                        ResourceType = "vpn-concentrator"
+	ResourceTypeIpamPoolAllocation                                     ResourceType = "ipam-pool-allocation"
+	ResourceTypeCapacityReservationCancellationQuote                   ResourceType = "capacity-reservation-cancellation-quote"
 )
 
 // Values returns all known values for ResourceType. Note that this can be
@@ -9710,6 +9777,8 @@ func (ResourceType) Values() []ResourceType {
 		"secondary-subnet",
 		"capacity-manager-data-export",
 		"vpn-concentrator",
+		"ipam-pool-allocation",
+		"capacity-reservation-cancellation-quote",
 	}
 }
 
@@ -11402,6 +11471,7 @@ const (
 	TransitGatewayAttachmentResourceTypePeering              TransitGatewayAttachmentResourceType = "peering"
 	TransitGatewayAttachmentResourceTypeTgwPeering           TransitGatewayAttachmentResourceType = "tgw-peering"
 	TransitGatewayAttachmentResourceTypeNetworkFunction      TransitGatewayAttachmentResourceType = "network-function"
+	TransitGatewayAttachmentResourceTypeClientVpn            TransitGatewayAttachmentResourceType = "client-vpn"
 )
 
 // Values returns all known values for TransitGatewayAttachmentResourceType. Note
@@ -11419,6 +11489,7 @@ func (TransitGatewayAttachmentResourceType) Values() []TransitGatewayAttachmentR
 		"peering",
 		"tgw-peering",
 		"network-function",
+		"client-vpn",
 	}
 }
 
@@ -11461,6 +11532,34 @@ func (TransitGatewayAttachmentState) Values() []TransitGatewayAttachmentState {
 		"rejected",
 		"rejecting",
 		"failing",
+	}
+}
+
+type TransitGatewayAttachmentStatusType string
+
+// Enum values for TransitGatewayAttachmentStatusType
+const (
+	TransitGatewayAttachmentStatusTypePendingAcceptance TransitGatewayAttachmentStatusType = "pending-acceptance"
+	TransitGatewayAttachmentStatusTypePending           TransitGatewayAttachmentStatusType = "pending"
+	TransitGatewayAttachmentStatusTypeRejected          TransitGatewayAttachmentStatusType = "rejected"
+	TransitGatewayAttachmentStatusTypeAvailable         TransitGatewayAttachmentStatusType = "available"
+	TransitGatewayAttachmentStatusTypeDeleting          TransitGatewayAttachmentStatusType = "deleting"
+	TransitGatewayAttachmentStatusTypeDeleted           TransitGatewayAttachmentStatusType = "deleted"
+)
+
+// Values returns all known values for TransitGatewayAttachmentStatusType. Note
+// that this can be expanded in the future, and so it is only as up to date as the
+// client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (TransitGatewayAttachmentStatusType) Values() []TransitGatewayAttachmentStatusType {
+	return []TransitGatewayAttachmentStatusType{
+		"pending-acceptance",
+		"pending",
+		"rejected",
+		"available",
+		"deleting",
+		"deleted",
 	}
 }
 

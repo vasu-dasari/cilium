@@ -10,15 +10,17 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"net/netip"
 	"slices"
 
 	ec2_types "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	"github.com/cilium/cilium/operator/pkg/ipam/nodemanager"
 	"github.com/cilium/cilium/pkg/aws/eni/limits"
 	eniTypes "github.com/cilium/cilium/pkg/aws/eni/types"
 	"github.com/cilium/cilium/pkg/aws/metadata"
 	"github.com/cilium/cilium/pkg/aws/types"
-	"github.com/cilium/cilium/pkg/ipam"
+	iputil "github.com/cilium/cilium/pkg/ip"
 	ipamTypes "github.com/cilium/cilium/pkg/ipam/types"
 	v2 "github.com/cilium/cilium/pkg/k8s/apis/cilium.io/v2"
 	"github.com/cilium/cilium/pkg/lock"
@@ -103,7 +105,7 @@ func NewInstancesManager(ctx context.Context, logger *slog.Logger, ec2api EC2API
 
 // CreateNode is called on discovery of a new node and returns the ENI node
 // allocation implementation for the new node
-func (m *InstancesManager) CreateNode(obj *v2.CiliumNode, n *ipam.Node) ipam.NodeOperations {
+func (m *InstancesManager) CreateNode(obj *v2.CiliumNode, n *nodemanager.Node) nodemanager.NodeOperations {
 	return NewNode(n, obj, m)
 }
 
@@ -325,15 +327,23 @@ func (m *InstancesManager) modifyIPsToENI(instanceID string, eniID string, ips [
 		return
 	}
 	if isAdd {
-		for _, ip := range ips {
-			if !slices.Contains(eni.Addresses, ip) {
-				eni.Addresses = append(eni.Addresses, ip)
+		for _, ipStr := range ips {
+			addr, err := netip.ParseAddr(ipStr)
+			if err != nil {
+				continue
+			}
+			if !slices.ContainsFunc(eni.Addresses, func(a iputil.Addr) bool { return a.Addr == addr }) {
+				eni.Addresses = append(eni.Addresses, iputil.AddrFrom(addr))
 			}
 		}
 	} else {
-		for _, ip := range ips {
-			eni.Addresses = slices.DeleteFunc(eni.Addresses, func(addr string) bool {
-				return addr == ip
+		for _, ipStr := range ips {
+			addr, err := netip.ParseAddr(ipStr)
+			if err != nil {
+				continue
+			}
+			eni.Addresses = slices.DeleteFunc(eni.Addresses, func(a iputil.Addr) bool {
+				return a.Addr == addr
 			})
 		}
 	}
